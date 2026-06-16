@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>力导向证据图 — 调查底稿</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-deep:#0f1923;--bg-panel:#162030;--bg-card:#1d2d3f;--bg-hover:#243548;
+  --border:#2a3f56;--border-lit:#3a5570;
+  --text-primary:#d8e6f0;--text-secondary:#7a9bb5;--text-dim:#4a6880;--text-id:#4ecdc4;
+  --amber:#e8a020;--amber-dim:#7a520f;--teal:#4ecdc4;--teal-dim:#1a4f4c;
+  --green:#52c97a;--red:#e85c5c;--purple:#9b7ae8;
+  --c-evidence:#7a9bb5;--c-clue:#4ecdc4;--c-argument:#9b7ae8;--c-finding:#e8a020;
+  --c-entity:#5a8aaa;--c-hypothesis:#c89050;--c-event:#7aaa5a;
+  --radius:6px;--radius-lg:10px;
+  --font-mono:'SF Mono','Fira Code','Cascadia Code',monospace;
+  --font-body:'Inter',system-ui,-apple-system,sans-serif
+}
+body{background:var(--bg-deep);color:var(--text-primary);font-family:var(--font-body);font-size:14px;line-height:1.6;min-height:100vh;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh}
+.topbar{background:var(--bg-panel);border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;flex-shrink:0;gap:12px}
+.case-badge{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;padding:3px 10px;border-radius:3px;font-weight:600;flex-shrink:0}
+.case-title{font-size:15px;font-weight:600}
+.case-subtitle{font-size:12px;color:var(--text-secondary)}
+.topbar-stats{display:flex;gap:8px;font-size:11px;color:var(--text-dim);margin-left:auto;flex-shrink:0}
+.stat-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:2px}
+.dot-ready{background:var(--green);box-shadow:0 0 4px var(--green)}
+.dot-draft{background:var(--amber);box-shadow:0 0 4px var(--amber)}
+.dot-superseded{background:var(--text-dim)}
+
+/* ── Canvas 画布 ──────────────────────────────────────── */
+.canvas-wrap{flex:1;position:relative;overflow:hidden}
+.canvas-wrap canvas{display:block;width:100%;height:100%}
+.canvas-tooltip{position:absolute;pointer-events:none;background:var(--bg-card);border:1px solid var(--border-lit);border-radius:var(--radius);padding:6px 10px;font-size:11px;color:var(--text-primary);max-width:260px;opacity:0;transition:opacity .15s;z-index:50}
+.canvas-tooltip.show{opacity:1}
+.tt-id{font-family:var(--font-mono);font-size:10px;color:var(--text-id)}
+.tt-title{font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis}
+.tt-status{font-size:10px;color:var(--text-dim);margin-top:1px}
+
+/* ── 图例 ──────────────────────────────────────────────── */
+.legend{position:absolute;bottom:16px;left:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 14px;display:flex;flex-direction:column;gap:4px;z-index:10;font-size:11px}
+.legend-row{display:flex;align-items:center;gap:8px}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.legend-label{color:var(--text-secondary);white-space:nowrap}
+
+/* ── 模态框（节点详情）────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg-panel);border:1px solid var(--border-lit);border-radius:var(--radius-lg);width:100%;max-width:620px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.modal-id{font-family:var(--font-mono);font-size:13px;font-weight:700;flex-shrink:0}
+.modal-title{margin-left:10px;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.modal-close{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:2px 8px;border-radius:var(--radius)}
+.modal-close:hover{color:var(--text-primary)}
+.modal-body{padding:16px 18px;overflow-y:auto;flex:1;font-size:13px;line-height:1.7}
+.modal-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.modal-meta-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px}
+.modal-meta-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:2px}
+.modal-meta-value{font-size:12px}
+.modal-section{margin-bottom:12px}
+.modal-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);margin-bottom:6px}
+.modal-content{color:var(--text-secondary);white-space:pre-wrap;font-size:12px;line-height:1.6}
+.modal-sources{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.modal-source{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:11px;transition:background .15s}
+.modal-source:hover{background:var(--bg-hover)}
+.modal-source-id{font-family:var(--font-mono);font-size:10px;color:var(--text-id);flex-shrink:0}
+.modal-source-excerpt{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-lit);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#4a6880}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <span class="case-badge" id="case-badge">CASE</span>
+    <div>
+      <div class="case-title" id="case-title">—</div>
+      <div class="case-subtitle" id="case-subtitle">—</div>
+    </div>
+    <div class="topbar-stats" id="stats-bar"></div>
+  </div>
+  <div class="canvas-wrap" id="canvas-wrap">
+    <canvas id="force-canvas"></canvas>
+    <div class="canvas-tooltip" id="force-tooltip"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-id" id="modal-id" style="color:var(--c-evidence)"></span>
+      <span class="modal-title" id="modal-title"></span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+<script>
+// INJECTION_START_MARKER
+// INJECTION_END_MARKER
+
+// ═══════════════════════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════════════════════
+const TYPE_COLORS = {
+  EV:{fill:'#7a9bb5',bg:'rgba(122,155,181,.2)',border:'#8ab0cc'},
+  LS:{fill:'#4ecdc4',bg:'rgba(78,205,196,.2)',border:'#6aded0'},
+  ARG:{fill:'#9b7ae8',bg:'rgba(155,122,232,.2)',border:'#b094ee'},
+  FND:{fill:'#e8a020',bg:'rgba(232,160,32,.2)',border:'#f0b840'},
+  ENT:{fill:'#5a8aaa',bg:'rgba(90,138,170,.2)',border:'#7aa0b8'},
+  HYP:{fill:'#c89050',bg:'rgba(200,144,80,.2)',border:'#d4a868'},
+  EVT:{fill:'#7aaa5a',bg:'rgba(122,170,90,.2)',border:'#90c070'},
+};
+const STATUS_LABELS={ready:'就绪',draft:'草稿',superseded:'已取代'};
+const TYPE_LABELS={EV:'原始证据',LS:'线索',ARG:'论据',FND:'结论',ENT:'实体',HYP:'假设',EVT:'事件'};
+const $=id=>document.getElementById(id);
+function typeColor(t){return TYPE_COLORS[t]||{fill:'#666',bg:'rgba(100,100,100,.2)',border:'#888'}}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&#34;')}
+
+// ═══════════════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════════════
+$('case-badge').textContent=CASE_DATA.id;
+$('case-title').textContent=CASE_DATA.title;
+$('case-subtitle').textContent=CASE_DATA.subtitle;
+let st='';
+for(const[k,v]of Object.entries(CASE_DATA.stats.statuses))if(v>0)st+=`<span><span class="stat-dot dot-${k}"></span>${v}</span>`;
+st+=`<span style="color:var(--text-dim)">| ${CASE_DATA.stats.total} 节点</span>`;
+$('stats-bar').innerHTML=st;
+
+// ═══════════════════════════════════════════════════════════════
+// 图例
+// ═══════════════════════════════════════════════════════════════
+(function buildLegend(){
+  const legend=$('legend');
+  const types=[['FND','结论','#e8a020'],['ARG','论据','#9b7ae8'],['LS','线索','#4ecdc4'],['EV','原始证据','#7a9bb5']];
+  let h='';
+  for(const[k,label,color]of types)
+    h+=`<div class="legend-row"><span class="legend-dot" style="background:${color}"></span><span class="legend-label">${label}</span></div>`;
+  h+='<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border);color:var(--text-dim);font-size:10px">拖拽节点 · 悬停查看 · 点击详情</div>';
+  legend.innerHTML=h
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// Canvas 辅助
+// ═══════════════════════════════════════════════════════════════
+function resizeCanvas(name){
+  const w=$(name+'-canvas').parentElement;
+  const c=$(name+'-canvas');
+  const r=w.getBoundingClientRect();
+  const d=window.devicePixelRatio||1;
+  c.width=r.width*d;c.height=r.height*d;
+  c.style.width=r.width+'px';c.style.height=r.height+'px';
+  const ctx=c.getContext('2d');ctx.scale(d,d);
+  return{ctx,w:r.width,h:r.height,dpr:d}
+}
+function canvasCoords(c,e){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+
+// ═══════════════════════════════════════════════════════════════
+// 力导向图 — 简易物理模拟 + Canvas 2D
+// ═══════════════════════════════════════════════════════════════
+let forceNodes=[],forceEdges=[],forceRunning=false,dragNode=null,dx=0,dy=0;
+
+function renderForce(){
+  const r=resizeCanvas('force');if(!r)return;
+  const{ctx,w,h}=r,list=Object.values(NODES_DATA);
+  if(!list.length){ctx.fillStyle='#4a6880';ctx.textAlign='center';ctx.font='14px sans-serif';ctx.fillText('无节点数据',w/2,h/2);return}
+
+  const types=new Set(list.map(n=>n.type));
+  const gap=w*.25;
+  let offset=gap;
+  const zoneMap={};
+  for(const t of['EV','LS','ARG','FND','ENT','HYP','EVT']){
+    if(types.has(t)){zoneMap[t]={cx:offset,cy:h/2};offset+=gap}
+  }
+
+  forceNodes=list.map((n,i)=>{
+    const z=zoneMap[n.type]||{cx:w/2,cy:h/2};
+    return{id:n.id,node:n,x:z.cx+(Math.random()-.5)*gap*.6,y:z.cy+(Math.random()-.5)*gap*.6,vx:0,vy:0,pinned:false}
+  });
+  forceEdges=EDGES_DATA.filter(e=>NODES_DATA[e.from]&&NODES_DATA[e.to]);
+  forceRunning=true;
+
+  function tick(){
+    if(!forceRunning)return;const nm={};forceNodes.forEach(n=>nm[n.id]=n);
+    for(let i=0;i<forceNodes.length;i++)for(let j=i+1;j<forceNodes.length;j++){
+      const a=forceNodes[i],b=forceNodes[j],dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1,f=12000/(dist*dist);
+      if(!a.pinned){a.vx-=dx/dist*f;a.vy-=dy/dist*f}if(!b.pinned){b.vx+=dx/dist*f;b.vy+=dy/dist*f}
+    }
+    for(const e of forceEdges){
+      const a=nm[e.from],b=nm[e.to];if(!a||!b)continue;
+      const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1,f=.005*(dist-80);
+      if(!a.pinned){a.vx+=dx/dist*f;a.vy+=dy/dist*f}if(!b.pinned){b.vx-=dx/dist*f;b.vy-=dy/dist*f}
+    }
+    // Zone gravity — 拉回所属类型区域
+    for(const n of forceNodes){
+      if(n.pinned)continue;
+      const z=zoneMap[n.node.type];
+      if(z){const gx=z.cx-n.x,gy=z.cy-n.y,g=Math.sqrt(gx*gx+gy*gy)||1;n.vx+=gx/g*.003;n.vy+=gy/g*.003}
+    }
+    for(const n of forceNodes){
+      if(n.pinned)continue;
+      n.vx+=(w/2-n.x)*.001;n.vy+=(h/2-n.y)*.001;
+      n.vx*=.85;n.vy*=.85;
+      n.x+=n.vx;n.y+=n.vy;
+      n.x=Math.max(20,Math.min(w-20,n.x));n.y=Math.max(20,Math.min(h-20,n.y))
+    }
+    const e=forceNodes.reduce((s,n)=>s+Math.abs(n.vx)+Math.abs(n.vy),0);
+    drawForce(ctx,w,h);
+    if(e>.5)requestAnimationFrame(tick);else forceRunning=false
+  }
+  tick()
+}
+
+function drawForce(ctx,w,h){
+  ctx.clearRect(0,0,w,h);
+
+  // 连接线
+  for(const e of forceEdges){
+    const f=forceNodes.find(n=>n.id===e.from),t=forceNodes.find(n=>n.id===e.to);
+    if(!f||!t)continue;
+    ctx.strokeStyle='rgba(58,79,86,.5)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+    // excerpt 标签
+    if(e.excerpt){
+      const mx=(f.x+t.x)/2,my=(f.y+t.y)/2;
+      ctx.font='9px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillStyle='#4a6880';
+      const l=e.excerpt.length>15?e.excerpt.slice(0,14)+'…':e.excerpt;
+      ctx.fillText(l,mx,my-2)
+    }
+  }
+
+  // 节点
+  for(const fn of forceNodes){
+    const cc=typeColor(fn.node.type);
+    const rad=fn.node.type==='FND'?10:fn.node.type==='ARG'?8:fn.node.type==='LS'?6:5;
+
+    // 发光效果
+    const grad=ctx.createRadialGradient(fn.x,fn.y,0,fn.x,fn.y,rad*2.5);
+    grad.addColorStop(0,cc.fill+'30');
+    grad.addColorStop(1,'transparent');
+    ctx.fillStyle=grad;
+    ctx.beginPath();ctx.arc(fn.x,fn.y,rad*2.5,0,Math.PI*2);ctx.fill();
+
+    // 实体圆
+    ctx.beginPath();ctx.arc(fn.x,fn.y,rad,0,Math.PI*2);
+    ctx.fillStyle=cc.fill;ctx.fill();
+    ctx.strokeStyle=fn.node.status==='draft'?'#e8a020':cc.border;
+    ctx.lineWidth=fn.node.status==='draft'?2:1.5;ctx.stroke();
+
+    // 标签
+    ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillStyle='#d8e6f0';ctx.fillText(fn.node.id,fn.x,fn.y+rad+4)
+  }
+}
+
+// ── 鼠标交互 ────────────────────────────────────────────
+$('force-canvas').addEventListener('mousemove',e=>{
+  const p=canvasCoords(e.target,e);
+  const hit=forceNodes.find(n=>Math.sqrt((p.x-n.x)**2+(p.y-n.y)**2)<12);
+  const tt=$('force-tooltip');
+  if(hit){tt.innerHTML=`<div class="tt-id">${hit.node.id}</div><div class="tt-title">${esc(hit.node.title)}</div><div class="tt-status"><span class="stat-dot dot-${hit.node.status}"></span>${STATUS_LABELS[hit.node.status]||hit.node.status}</div>`;tt.style.left=(p.x+14)+'px';tt.style.top=(p.y+14)+'px';tt.classList.add('show')}
+  else tt.classList.remove('show')
+});
+$('force-canvas').addEventListener('mouseleave',()=>$('force-tooltip').classList.remove('show'));
+
+$('force-canvas').addEventListener('mousedown',e=>{
+  const p=canvasCoords(e.target,e);
+  const hit=forceNodes.find(n=>Math.sqrt((p.x-n.x)**2+(p.y-n.y)**2)<12);
+  if(hit){dragNode=hit;dragNode.pinned=true;dx=p.x-hit.x;dy=p.y-hit.y}
+});
+document.addEventListener('mousemove',e=>{
+  if(!dragNode)return;
+  const p=canvasCoords($('force-canvas'),e);
+  dragNode.x=p.x-dx;dragNode.y=p.y-dy
+});
+document.addEventListener('mouseup',()=>{dragNode=null});
+
+$('force-canvas').addEventListener('click',e=>{
+  const p=canvasCoords(e.target,e);
+  const hit=forceNodes.find(n=>Math.sqrt((p.x-n.x)**2+(p.y-n.y)**2)<12);
+  if(hit)showModal(hit.node.id)
+});
+
+// ═══════════════════════════════════════════════════════════════
+// 模态框（节点详情）
+// ═══════════════════════════════════════════════════════════════
+function showModal(nid){
+  const n=NODES_DATA[nid];if(!n)return;
+  const cc=typeColor(n.type);
+  $('modal-id').style.color=cc.fill;
+  $('modal-id').textContent=n.id;
+  $('modal-title').textContent=n.title;
+  let b=`<div class="modal-meta"><div class="modal-meta-item"><div class="modal-meta-label">类型</div><div class="modal-meta-value">${TYPE_LABELS[n.type]||n.type}</div></div>
+<div class="modal-meta-item"><div class="modal-meta-label">状态</div><div class="modal-meta-value"><span class="stat-dot dot-${n.status}"></span>${STATUS_LABELS[n.status]||n.status}</div></div>
+<div class="modal-meta-item"><div class="modal-meta-label">置信度</div><div>${n.confidence||'—'}</div></div>
+<div class="modal-meta-item"><div class="modal-meta-label">生成</div><div>${n.generated_by||'—'}</div></div></div>`;
+  if(n.type==='EV'&&(n.evidence_type||n.collected_at||n.collected_by)){
+    b+='<div class="modal-section"><div class="modal-section-label">证据信息</div>';
+    if(n.source)b+=`<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">来源: ${esc(n.source)}</div>`;
+    if(n.collected_at)b+=`<div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">收集: ${n.collected_at}</div>`;
+    if(n.collected_by)b+=`<div style="font-size:12px;color:var(--text-dim)">收集人: ${n.collected_by}</div>`;
+    b+='</div>'
+  }
+  if(n.body)b+=`<div class="modal-section"><div class="modal-section-label">内容</div><div class="modal-content">${esc(n.body)}</div></div>`;
+  if(n.sources&&n.sources.length){
+    b+='<div class="modal-section"><div class="modal-section-label">来源</div><div class="modal-sources">';
+    for(const s of n.sources){
+      const sc=NODES_DATA[s.id];const tc=typeColor(sc?sc.type:'EV');
+      b+=`<div class="modal-source" onclick="showModal('${s.id}');event.stopPropagation()"><span class="modal-source-id" style="color:${tc.fill}">${s.id}</span><span class="modal-source-excerpt">${s.excerpt?'"'+esc(s.excerpt)+'"':'—'}</span></div>`
+    }
+    b+='</div></div>'
+  }
+  const refBy=Object.values(NODES_DATA).filter(x=>x.sources&&x.sources.some(s=>s.id===nid));
+  if(refBy.length){
+    b+='<div class="modal-section"><div class="modal-section-label">被引用为来源</div><div class="modal-sources">';
+    for(const r of refBy){const rc=typeColor(r.type);b+=`<div class="modal-source" onclick="showModal('${r.id}');event.stopPropagation()"><span class="modal-source-id" style="color:${rc.fill}">${r.id}</span><span class="modal-source-excerpt">${esc(r.title)}</span></div>`}
+    b+='</div></div>'
+  }
+  $('modal-body').innerHTML=b;
+  $('modal-overlay').classList.add('open')
+}
+function closeModal(){$('modal-overlay').classList.remove('open')}
+$('modal-overlay').addEventListener('click',e=>{if(e.target===$('modal-overlay'))closeModal()})
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()})
+
+// ═══════════════════════════════════════════════════════════════
+// Resize
+// ═══════════════════════════════════════════════════════════════
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{if(forceRunning)return;renderForce()},200)});
+
+// ═══════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════
+renderForce();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "cc-investigation",
+  "version": "1.0.0",
+  "description": "反舞弊调查全流程插件市场 — 调查方法论、证据链管理、访谈分析、可视化报告、审计技术、流程分析",
+  "author": {
+    "name": "Alpha Shen",
+    "url": "https://github.com/sxd007"
+  },
+  "homepage": "https://github.com/sxd007/cc-investigation",
+  "repository": "https://github.com/sxd007/cc-investigation",
+  "license": "Apache-2.0",
+  "disclaimer": "see DISCLAIMER.md",
+  "keywords": [
+    "investigation",
+    "fraud-examination",
+    "forensic-accounting",
+    "internal-audit",
+    "evidence-management",
+    "interview-analysis",
+    "claude-code",
+    "skills"
+  ],
+  "mcpServers": {},
+  "skills": ["./skills/"],
+  "commands": ["./commands/"]
+}

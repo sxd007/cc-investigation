@@ -1,0 +1,779 @@
+{
+  "fraud_tree": {
+    "name": "Occupational Fraud and Abuse Classification System",
+    "categories": [
+      {
+        "id": "corruption",
+        "name": "Corruption",
+        "alias": "腐败",
+        "definition": "员工滥用其在业务交易中的影响力，违反其对雇主的职责以获取利益（例如，涉及贿赂或利益冲突的舞弊）。",
+        "case_percentage": 0.48,
+        "median_loss_usd": 200000,
+        "risk_characteristics": [
+          "涉及第三方关系",
+          "调查复杂度高",
+          "难以通过内部控制发现",
+          "通常需要外部举报",
+          "可能涉及监管合规风险"
+        ],
+        "business_data_domains": [
+          "采购系统",
+          "供应商主数据",
+          "合同管理系统",
+          "销售交易记录",
+          "招投标文档",
+          "付款审批流",
+          "利益冲突申报表"
+        ],
+        "subcategories": [
+          {
+            "id": "conflicts_of_interest",
+            "name": "Conflicts of Interest",
+            "alias": "利益冲突",
+            "definition": "员工在业务交易中存在未披露的个人利益，影响其客观决策。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "隐蔽性强",
+              "长期持续性",
+              "涉及关联方交易"
+            ],
+            "business_data_domains": [
+              "员工亲属关系申报",
+              "供应商受益所有人信息",
+              "关联交易记录"
+            ],
+            "schemes": [
+              {
+                "id": "purchasing_schemes",
+                "name": "Purchasing Schemes",
+                "alias": "采购舞弊",
+                "definition": "员工利用采购职权为个人或关联方谋取不正当利益。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "涉及供应商选择偏见",
+                  "价格操纵"
+                ],
+                "business_data_domains": [
+                  "采购订单",
+                  "供应商评估报告",
+                  "比价记录"
+                ]
+              },
+              {
+                "id": "sales_schemes",
+                "name": "Sales Schemes",
+                "alias": "销售舞弊",
+                "definition": "员工利用销售职权为个人或关联方谋取不正当利益。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "客户资源私用",
+                  "佣金转移"
+                ],
+                "business_data_domains": [
+                  "客户主数据",
+                  "销售合同",
+                  "佣金计算表"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "bribery",
+            "name": "Bribery",
+            "alias": "贿赂",
+            "definition": "提供、给予、接受或索取有价值之物以影响业务决策。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "双向违法性",
+              "现金或实物形式",
+              "跨境合规风险高"
+            ],
+            "business_data_domains": [
+              "费用报销系统",
+              "礼品登记册",
+              "银行流水",
+              "现金日记账"
+            ],
+            "schemes": [
+              {
+                "id": "invoice_kickbacks",
+                "name": "Invoice Kickbacks",
+                "alias": "发票回扣",
+                "definition": "供应商向采购方员工支付回扣以获取业务或提高价格。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "价格虚高",
+                  "虚假发票"
+                ],
+                "business_data_domains": [
+                  "发票数据",
+                  "付款记录",
+                  "供应商价格库"
+                ]
+              },
+              {
+                "id": "bid_rigging",
+                "name": "Bid Rigging",
+                "alias": "围标串标",
+                "definition": "操纵招投标过程，使特定供应商中标。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "限制竞争",
+                  "价格同盟",
+                  "信息泄露"
+                ],
+                "business_data_domains": [
+                  "招投标文件",
+                  "投标方信息",
+                  "评标记录",
+                  "保证金流水"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "illegal_gratuities",
+            "name": "Illegal Gratuities",
+            "alias": "非法馈赠",
+            "definition": "为获得业务优势而给予或接受的非法礼物或报酬，区别于贿赂在于不一定有明确的交换条件。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "灰色地带",
+              "文化差异影响",
+              "累积效应"
+            ],
+            "business_data_domains": [
+              "礼品接收记录",
+              "招待费明细",
+              "差旅报销"
+            ],
+            "schemes": []
+          },
+          {
+            "id": "economic_extortion",
+            "name": "Economic Extortion",
+            "alias": "经济勒索",
+            "definition": "通过威胁或强迫获取利益，包括威胁曝光、破坏业务等手段。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "胁迫性",
+              "可能涉及犯罪组织",
+              "隐蔽支付"
+            ],
+            "business_data_domains": [
+              "异常付款记录",
+              "法律咨询费用",
+              "安保支出"
+            ],
+            "schemes": []
+          }
+        ]
+      },
+      {
+        "id": "asset_misappropriation",
+        "name": "Asset Misappropriation",
+        "alias": "资产挪用",
+        "definition": "员工窃取或滥用雇主的资源（例如，盗窃公司现金、虚假开票舞弊等）。",
+        "case_percentage": 0.89,
+        "median_loss_usd": 120000,
+        "risk_characteristics": [
+          "发生频率最高",
+          "单案损失相对较小",
+          "内部控制可防范",
+          "多为个人作案",
+          "发现周期短"
+        ],
+        "business_data_domains": [
+          "总账系统",
+          "库存管理系统",
+          "现金管理系统",
+          "银行对账单",
+          "固定资产登记",
+          "费用报销系统"
+        ],
+        "subcategories": [
+          {
+            "id": "cash",
+            "name": "Cash",
+            "alias": "现金",
+            "definition": "涉及现金及现金等价物的挪用或盗窃。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "流动性高",
+              "难以追踪",
+              "即时变现"
+            ],
+            "business_data_domains": [
+              "现金日记账",
+              "银行流水",
+              "收银系统",
+              "金库出入记录"
+            ],
+            "schemes": [
+              {
+                "id": "cash_on_hand_misappropriation",
+                "name": "Cash-on-Hand Misappropriation",
+                "alias": "手头现金挪用",
+                "definition": "舞弊者在受害组织场所内挪用手头现金（例如，员工从公司收银机中窃取现金）。",
+                "case_percentage": 0.11,
+                "median_loss_usd": 50000,
+                "risk_characteristics": [
+                  "物理接触现金",
+                  "小额多次",
+                  "收银岗位高发"
+                ],
+                "business_data_domains": [
+                  "收银机日志",
+                  "现金盘点表",
+                  "备用金领用记录",
+                  "POS交易数据"
+                ],
+                "sub_schemes": []
+              },
+              {
+                "id": "theft_of_cash_receipts",
+                "name": "Theft of Cash Receipts",
+                "alias": "现金收入盗窃",
+                "definition": "窃取组织已收到或应收的现金款项。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "涉及收入确认环节",
+                  "账面痕迹可追踪"
+                ],
+                "business_data_domains": [
+                  "应收账款明细",
+                  "收款记录",
+                  "存款单",
+                  "客户付款确认"
+                ],
+                "sub_schemes": [
+                  {
+                    "id": "skimming",
+                    "name": "Skimming",
+                    "alias": "瞒报收入",
+                    "definition": "在入账前窃取组织的进款（例如，员工接受客户付款但不记录销售，而是中饱私囊）。",
+                    "case_percentage": 0.10,
+                    "median_loss_usd": 43000,
+                    "risk_characteristics": [
+                      "最难被发现",
+                      "无账面记录",
+                      "现金业务高发",
+                      "需要绕过内部控制"
+                    ],
+                    "business_data_domains": [
+                      "销售流水",
+                      "客户对账单",
+                      "存货出库记录",
+                      "银行进账流水",
+                      "POS系统日志"
+                    ],
+                    "methods": [
+                      {
+                        "id": "sales_skimming",
+                        "name": "Sales",
+                        "alias": "销售瞒报",
+                        "definition": "对销售收款进行瞒报。",
+                        "techniques": [
+                          {
+                            "name": "Unrecorded",
+                            "alias": "未入账",
+                            "description": "完全不做销售记录，直接侵吞货款。"
+                          },
+                          {
+                            "name": "Understated",
+                            "alias": "低报",
+                            "description": "记录部分金额，差额部分侵吞。"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "receivables_skimming",
+                        "name": "Receivables",
+                        "alias": "应收账款瞒报",
+                        "definition": "对客户还款进行瞒报或挪用。",
+                        "techniques": [
+                          {
+                            "name": "Write-Off Schemes",
+                            "alias": "核销舞弊",
+                            "description": "虚假核销应收账款以掩盖挪用行为。"
+                          },
+                          {
+                            "name": "Lapping Schemes",
+                            "alias": "截留挪用",
+                            "description": "用后收到的款项冲抵前被挪用的款项，滚动掩盖。"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "refunds_skimming",
+                        "name": "Refunds and Other",
+                        "alias": "退款及其他瞒报",
+                        "definition": "对退款或其他收款进行瞒报。",
+                        "techniques": [
+                          {
+                            "name": "Unconcealed",
+                            "alias": "未掩饰",
+                            "description": "直接挪用不作任何掩饰，依赖监管缺失。"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "cash_larceny",
+                    "name": "Cash Larceny",
+                    "alias": "现金盗窃",
+                    "definition": "在入账后窃取组织的进款（例如，员工在每日收入存入银行前窃取现金和支票）。",
+                    "case_percentage": 0.10,
+                    "median_loss_usd": 50000,
+                    "risk_characteristics": [
+                      "账面已记录",
+                      "需要破坏控制",
+                      "容易被发现"
+                    ],
+                    "business_data_domains": [
+                      "现金日记账",
+                      "银行对账单",
+                      "存款凭证",
+                      "现金盘点记录"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Unconcealed",
+                        "alias": "未掩饰",
+                        "description": "直接盗窃现金，不做账目调整。"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "fraudulent_disbursements",
+                "name": "Fraudulent Disbursements",
+                "alias": "欺诈性支出",
+                "definition": "通过欺骗手段使组织支付虚假或不当的款项。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "涉及付款审批链",
+                  "需要伪造单据",
+                  "金额可大可小"
+                ],
+                "business_data_domains": [
+                  "应付账款系统",
+                  "付款审批流",
+                  "发票验证系统",
+                  "供应商主数据"
+                ],
+                "sub_schemes": [
+                  {
+                    "id": "billing_schemes",
+                    "name": "Billing Schemes",
+                    "alias": "开票舞弊",
+                    "definition": "通过提交虚假商品/服务发票、虚增发票或个人采购发票使雇主付款。",
+                    "case_percentage": 0.22,
+                    "median_loss_usd": 100000,
+                    "risk_characteristics": [
+                      "最常见的高损失舞弊",
+                      "涉及虚假供应商",
+                      "审批链绕过",
+                      "长期累积"
+                    ],
+                    "business_data_domains": [
+                      "发票影像系统",
+                      "采购订单",
+                      "收货确认单",
+                      "供应商银行信息",
+                      "合同管理系统"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Shell Company",
+                        "alias": "空壳公司",
+                        "description": "设立或控制虚假公司，向雇主开具虚假发票。"
+                      },
+                      {
+                        "name": "Non-Accomplice Vendor",
+                        "alias": "非共谋供应商",
+                        "description": "利用真实供应商，通过篡改发票或重复提交进行舞弊。"
+                      },
+                      {
+                        "name": "Personal Purchases",
+                        "alias": "个人采购",
+                        "description": "购买个人物品，以公司名义开具发票报销。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "payroll_schemes",
+                    "name": "Payroll Schemes",
+                    "alias": "工资舞弊",
+                    "definition": "通过虚假薪酬索赔使雇主付款。",
+                    "case_percentage": 0.10,
+                    "median_loss_usd": 50000,
+                    "risk_characteristics": [
+                      "涉及HR系统",
+                      "长期持续性",
+                      "难以察觉"
+                    ],
+                    "business_data_domains": [
+                      "HR系统",
+                      "考勤记录",
+                      "工资发放表",
+                      "员工主数据",
+                      "银行代发记录"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Ghost Employee",
+                        "alias": "虚假员工",
+                        "description": "在工资系统中虚构员工，领取工资。"
+                      },
+                      {
+                        "name": "Falsified Wages",
+                        "alias": "虚报工资",
+                        "description": "虚报工时、加班或薪资标准。"
+                      },
+                      {
+                        "name": "Commission Schemes",
+                        "alias": "佣金舞弊",
+                        "description": "虚报销售业绩或佣金计算基础。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "expense_reimbursement_schemes",
+                    "name": "Expense Reimbursement Schemes",
+                    "alias": "费用报销舞弊",
+                    "definition": "对虚构或虚增的业务费用申请报销。",
+                    "case_percentage": 0.13,
+                    "median_loss_usd": 50000,
+                    "risk_characteristics": [
+                      "高频小额",
+                      "审批流于形式",
+                      "个人消费混入"
+                    ],
+                    "business_data_domains": [
+                      "费用报销系统",
+                      "发票影像",
+                      "差旅预订系统",
+                      "信用卡账单",
+                      "审批流记录"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Mischaracterized Expenses",
+                        "alias": "费用性质篡改",
+                        "description": "将个人消费伪装成业务费用报销。"
+                      },
+                      {
+                        "name": "Overstated Expenses",
+                        "alias": "虚增费用",
+                        "description": "夸大实际发生的费用金额。"
+                      },
+                      {
+                        "name": "Fictitious Expenses",
+                        "alias": "虚构费用",
+                        "description": "完全虚构未发生的费用。"
+                      },
+                      {
+                        "name": "Multiple Reimbursements",
+                        "alias": "重复报销",
+                        "description": "同一笔费用多次提交报销。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "check_and_payment_tampering",
+                    "name": "Check and Payment Tampering",
+                    "alias": "支票与付款篡改",
+                    "definition": "通过拦截、伪造或篡改支票或电子付款窃取雇主资金。",
+                    "case_percentage": 0.11,
+                    "median_loss_usd": 155000,
+                    "risk_characteristics": [
+                      "欺诈性支出中损失最高",
+                      "涉及银行操作",
+                      "需要接触空白支票或付款权限"
+                    ],
+                    "business_data_domains": [
+                      "支票领用登记",
+                      "银行对账单",
+                      "付款指令系统",
+                      "电子银行流水",
+                      "印章使用记录"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Forged Maker",
+                        "alias": "伪造出票人",
+                        "description": "伪造授权签字人签名开具支票。"
+                      },
+                      {
+                        "name": "Forged Endorsement",
+                        "alias": "伪造背书",
+                        "description": "伪造收款人背书转让支票。"
+                      },
+                      {
+                        "name": "Altered Payee",
+                        "alias": "篡改收款人",
+                        "description": "更改支票上的收款人信息。"
+                      },
+                      {
+                        "name": "Authorized Maker",
+                        "alias": "授权出票人",
+                        "description": "利用授权权限开具支票给自己或关联方。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "register_disbursement_schemes",
+                    "name": "Register Disbursement Schemes",
+                    "alias": "收银机支出舞弊",
+                    "definition": "通过虚假录入掩盖现金的欺诈性取出。",
+                    "case_percentage": 0.03,
+                    "median_loss_usd": 50000,
+                    "risk_characteristics": [
+                      "最少见",
+                      "零售行业高发",
+                      "利用系统漏洞"
+                    ],
+                    "business_data_domains": [
+                      "收银系统日志",
+                      "退款记录",
+                      "作废交易记录",
+                      "库存系统"
+                    ],
+                    "methods": [
+                      {
+                        "name": "False Voids",
+                        "alias": "虚假作废",
+                        "description": "虚假作废销售交易，实际已收款并侵吞。"
+                      },
+                      {
+                        "name": "False Refunds",
+                        "alias": "虚假退款",
+                        "description": "虚构退款交易，将现金取出。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "noncash_misappropriation",
+            "name": "Noncash Misappropriation",
+            "alias": "非现金资产挪用",
+            "definition": "员工窃取或滥用受害组织的非现金资产（例如，从仓库窃取存货；窃取或滥用机密客户信息）。",
+            "case_percentage": 0.22,
+            "median_loss_usd": 66000,
+            "risk_characteristics": [
+              "实物资产为主",
+              "需要转移或变现",
+              "盘点可发现"
+            ],
+            "business_data_domains": [
+              "库存管理系统",
+              "固定资产登记",
+              "无形资产清单",
+              "出入库记录",
+              "资产调拨单"
+            ],
+            "schemes": [
+              {
+                "id": "misuse",
+                "name": "Misuse",
+                "alias": "滥用",
+                "definition": "未经授权使用公司资产。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "使用权侵占",
+                  "资产损耗",
+                  "难以量化损失"
+                ],
+                "business_data_domains": [
+                  "资产使用日志",
+                  "车辆GPS记录",
+                  "设备借用登记"
+                ],
+                "methods": [
+                  {
+                    "name": "Asset Requisitions and Transfers",
+                    "alias": "资产申请与转移",
+                    "description": "虚假申请或转移资产至个人使用。"
+                  },
+                  {
+                    "name": "False Sales and Shipping",
+                    "alias": "虚假销售与发货",
+                    "description": "以销售名义将资产转移，实际无收款。"
+                  }
+                ]
+              },
+              {
+                "id": "larceny",
+                "name": "Larceny",
+                "alias": "盗窃",
+                "definition": "窃取公司非现金资产。",
+                "case_percentage": null,
+                "median_loss_usd": null,
+                "risk_characteristics": [
+                  "物理转移",
+                  "需要销赃渠道",
+                  "安全监控可防范"
+                ],
+                "business_data_domains": [
+                  "库存盘点表",
+                  "监控视频",
+                  "门禁记录",
+                  "资产标签系统"
+                ],
+                "methods": [
+                  {
+                    "name": "Purchasing and Receiving",
+                    "alias": "采购与收货",
+                    "description": "在采购收货环节窃取资产。"
+                  },
+                  {
+                    "name": "Unconcealed Larceny",
+                    "alias": "未掩饰盗窃",
+                    "description": "直接窃取不作掩饰。"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "financial_statement_fraud",
+        "name": "Financial Statement Fraud",
+        "alias": "财务报表欺诈",
+        "definition": "员工故意导致组织财务报告中重大信息的错报或遗漏（例如，记录虚构收入、低估报告费用或人为虚增报告资产）。",
+        "case_percentage": 0.05,
+        "median_loss_usd": 766000,
+        "risk_characteristics": [
+          "低频高损",
+          "管理层主导",
+          "系统性舞弊",
+          "审计风险高",
+          "监管处罚重",
+          "市场影响大"
+        ],
+        "business_data_domains": [
+          "总账系统",
+          "收入确认系统",
+          "资产评估报告",
+          "合并报表工作底稿",
+          "会计估计变更记录",
+          "关联方交易台账",
+          "期后事项记录"
+        ],
+        "subcategories": [
+          {
+            "id": "net_worth_overstatements",
+            "name": "Net Worth/Net Income Overstatements",
+            "alias": "净资产/净收入高估",
+            "definition": "通过虚增资产或收入、虚减负债或费用，高估企业财务状况或经营成果。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "业绩压力驱动",
+              "迎合市场预期",
+              "融资需求"
+            ],
+            "business_data_domains": [
+              "收入明细账",
+              "资产评估报告",
+              "负债确认时点",
+              "费用预提摊销表"
+            ],
+            "methods": [
+              {
+                "name": "Timing Differences",
+                "alias": "时间性差异",
+                "description": "操纵收入或费用的确认时点，提前确认收入或推迟确认费用。"
+              },
+              {
+                "name": "Fictitious Revenues",
+                "alias": "虚构收入",
+                "description": "记录虚假销售交易，无真实经济实质。"
+              },
+              {
+                "name": "Concealed Liabilities and Expenses",
+                "alias": "隐瞒负债与费用",
+                "description": "不记录或延迟记录已发生的负债和费用。"
+              },
+              {
+                "name": "Improper Asset Valuations",
+                "alias": "不当资产估值",
+                "description": "通过不合理的会计估计虚增资产价值。"
+              },
+              {
+                "name": "Improper Disclosures",
+                "alias": "不当披露",
+                "description": "不充分披露重大信息或误导性陈述。"
+              }
+            ]
+          },
+          {
+            "id": "net_worth_understatements",
+            "name": "Net Worth/Net Income Understatements",
+            "alias": "净资产/净收入低估",
+            "definition": "通过虚减资产或收入、虚增负债或费用，低估企业财务状况或经营成果。",
+            "case_percentage": null,
+            "median_loss_usd": null,
+            "risk_characteristics": [
+              "避税动机",
+              "业绩平滑",
+              "隐藏利润"
+            ],
+            "business_data_domains": [
+              "税务申报表",
+              "收入确认政策",
+              "准备金计提表",
+              "关联交易定价"
+            ],
+            "methods": [
+              {
+                "name": "Timing Differences",
+                "alias": "时间性差异",
+                "description": "推迟确认收入或提前确认费用。"
+              },
+              {
+                "name": "Understated Revenues",
+                "alias": "低估收入",
+                "description": "少记或隐瞒实际销售收入。"
+              },
+              {
+                "name": "Overstated Liabilities and Expenses",
+                "alias": "高估负债与费用",
+                "description": "虚增负债或费用项目。"
+              },
+              {
+                "name": "Improper Asset Valuations",
+                "alias": "不当资产估值",
+                "description": "通过不合理减值虚减资产价值。"
+              },
+              {
+                "name": "Improper Disclosures",
+                "alias": "不当披露",
+                "description": "隐瞒重要资产或收益来源。"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

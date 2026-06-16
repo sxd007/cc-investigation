@@ -1,0 +1,473 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "rules-core",
+      "kind": "rules",
+      "description": "调查准则与规范 — 证据规则、保密协议、职业道德、工作底稿标准",
+      "paths": [
+        "rules"
+      ],
+      "targets": [
+        "claude",
+        "claude-project",
+        "cursor"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "agents-core",
+      "kind": "agents",
+      "description": "核心子代理定义 — 调查规划师、证据分析师、访谈专家、报告撰写师",
+      "paths": [
+        "agents",
+        "AGENTS.md"
+      ],
+      "targets": [
+        "claude",
+        "claude-project",
+        "cursor"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "commands-core",
+      "kind": "commands",
+      "description": "核心调查斜杠命令 — /investigate, /interview, /evidence, /report 等",
+      "paths": [
+        "commands"
+      ],
+      "targets": [
+        "claude",
+        "claude-project",
+        "cursor"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "platform-configs",
+      "kind": "platform",
+      "description": "平台基线配置 — MCP 配置、包管理器设置、兼容层",
+      "paths": [
+        "mcp-configs"
+      ],
+      "targets": [
+        "claude",
+        "claude-project",
+        "cursor"
+      ],
+      "dependencies": [],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "investigation-foundation",
+      "kind": "skills",
+      "description": "调查哲学与方法论 — 调查思维框架、假设检验、推理方法、认知偏差防控",
+      "paths": [
+        "skills/investigation-foundation"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "rules-core",
+        "agents-core",
+        "commands-core"
+      ],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "fraud-classification",
+      "kind": "skills",
+      "description": "舞弊分类与路由 — 基于 ACFE 分类框架匹配线索信号、路由到对应 fraud-<domain> 场景技能",
+      "paths": [
+        "skills/fraud-classification"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation"
+      ],
+      "defaultInstall": false,
+      "cost": "heavy",
+      "stability": "stable"
+    },
+    {
+      "id": "investigation-techniques",
+      "kind": "skills",
+      "description": "调查工具与技术 — 访谈技巧、数据分析、数字取证、文档审查、外勤调查、监控技术",
+      "paths": [
+        "skills/investigation-techniques"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation"
+      ],
+      "defaultInstall": false,
+      "cost": "heavy",
+      "stability": "stable"
+    },
+    {
+      "id": "evidence-management",
+      "kind": "skills",
+      "description": "证据链与底稿管理 — 证据收集、保全、链式保管、可采性评估、底稿编制与复核",
+      "paths": [
+        "skills/evidence-management"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation"
+      ],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "interview-analysis",
+      "kind": "skills",
+      "description": "访谈与问话分析 — 访谈策划、陈述分析（SCAN）、行为分析、笔录评估、证言可信度评估",
+      "paths": [
+        "skills/interview-analysis"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "data-analysis",
+      "kind": "skills",
+      "description": "数据分析与审计技术 — 内部审计技术、流程分析、异常检测、数据可视化、审计轨迹分析",
+      "paths": [
+        "skills/data-analysis"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "writing-reporting",
+      "kind": "skills",
+      "description": "写作与报告技巧 — 调查底稿撰写、备忘录写作、调查报告写作、可视化呈现、故事化叙述",
+      "paths": [
+        "skills/writing-reporting"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "evidence-management"
+      ],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "case-management",
+      "kind": "skills",
+      "description": "调查流程与案件管理 — 案件生命周期管理、质量管控、团队协作、时间线管理、风险管理",
+      "paths": [
+        "skills/case-management"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "commands-core",
+        "platform-configs"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "beta"
+    },
+    {
+      "id": "mcp-integration",
+      "kind": "skills",
+      "description": "调查 MCP 工具集成层 — 技能与 MCP 服务器的连接桥梁",
+      "paths": [
+        "skills/mcp-integration",
+        "mcp-configs",
+        ".mcp.json",
+        "docs/capability-surface-selection.md"
+      ],
+      "targets": [
+        "claude",
+        "claude-project",
+        "cursor"
+      ],
+      "dependencies": [
+        "platform-configs"
+      ],
+      "defaultInstall": true,
+      "cost": "medium",
+      "stability": "stable"
+    },
+    {
+      "id": "cold-start-interview",
+      "kind": "skills",
+      "description": "首次设置向导 — Cold-start interview 引导调查员完成团队配置、证据策略、集成检查。配置写入持久化路径，所有技能依赖此配置运行。",
+      "paths": [
+        "skills/cold-start-interview",
+        "commands/cold-start-interview.md",
+        "config-templates"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "platform-configs"
+      ],
+      "defaultInstall": true,
+      "cost": "light",
+      "stability": "stable"
+    },
+    {
+      "id": "fraud-channel",
+      "kind": "skills",
+      "description": "渠道舞弊调查 — ICT 特价订单渠道场景：窜货、虚报终端客户、成本造假、拼单绑单、隐瞒渠道链路、隐瞒渠道利润。含六种渠道舞弊模式的参考信号库、调查切入点和访谈问题库。",
+      "paths": [
+        "skills/fraud-channel"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "heavy",
+      "stability": "beta"
+    },
+    {
+      "id": "fraud-reimbursement",
+      "kind": "skills",
+      "description": "费用报销舞弊调查 — 员工利用职务便利虚构、篡改、重复申报或不当归类的报销行为。覆盖信号识别、证据路径、数据分析方法和调查方案设计。",
+      "paths": [
+        "skills/fraud-reimbursement"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-procurement",
+      "kind": "skills",
+      "description": "采购舞弊调查 — 采购全生命周期（需求→寻源→定标→签约→收货→付款）中的舞弊行为。覆盖围标串标、化整为零、参数定制、虚假供应商、虚假收货、截标等模式的信号识别与调查方法。",
+      "paths": [
+        "skills/fraud-procurement"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-bid-rigging",
+      "kind": "skills",
+      "description": "投标操纵（围标/串标）调查 — 投标方之间或与招标方合谋破坏竞争机制的各类行为。覆盖压标、陪标、轮标、市场划分、转包回补、信息泄露等模式的信号识别与调查方法。",
+      "paths": [
+        "skills/fraud-bid-rigging"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-ip",
+      "kind": "skills",
+      "description": "知识产权舞弊调查 — 涵盖商业秘密窃取、竞业违规、专利侵权的调查方法。覆盖数据外泄检测、离职前行为链分析、竞业违约取证、专利侵权识别的信号识别与调查方案设计。",
+      "paths": [
+        "skills/fraud-ip"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-hr",
+      "kind": "skills",
+      "description": "人力资源舞弊调查 — 覆盖虚假员工（Ghost Employee）、薪资操纵（Payroll Fraud）、佣金舞弊、招聘舞弊、履历造假、考勤舞弊、福利滥用等场景的信号识别与调查方法。",
+      "paths": [
+        "skills/fraud-hr"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-fake-chop",
+      "kind": "skills",
+      "description": "伪造印章调查 — 私刻、变造、盗用、冒用公司公章或授权章的调查方法。覆盖印章真伪识别、印文比对方法、使用痕迹追溯、伪造目的判断。",
+      "paths": [
+        "skills/fraud-fake-chop"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "light",
+      "stability": "alpha"
+    },
+    {
+      "id": "fraud-conflicts-of-interest",
+      "kind": "skills",
+      "description": "利益冲突舞弊调查 — 员工在商业决策中存在未披露的个人利益，损害公司利益的各类场景。覆盖采购冲突、销售冲突、裙带关系、双重角色、回扣关联的信号识别与调查方法。",
+      "paths": [
+        "skills/fraud-conflicts-of-interest"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "fraud-classification"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "alpha"
+    },
+    {
+      "id": "order-execution-variance-analysis",
+      "kind": "skills",
+      "description": "项目执行差异分析 — 多维度对比合同流、货物流、资金流的申报记录与实际执行记录，输出结构化差异报告和可视化分析。跨场景通用工具。",
+      "paths": [
+        "skills/order-execution-variance-analysis"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "evidence-management"
+      ],
+      "defaultInstall": false,
+      "cost": "medium",
+      "stability": "beta"
+    },
+    {
+      "id": "investigation-memory",
+      "kind": "skills",
+      "description": "调查场景记忆系统 — 记录案件过程中的非结构化信息（讨论分支、灵感、犹豫、思考过程），形成可查询的底层档案，支撑复盘与定向检索，不干扰案件推进",
+      "paths": [
+        "skills/investigation-memory"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "investigation-foundation",
+        "evidence-management"
+      ],
+      "defaultInstall": false,
+      "cost": "light",
+      "stability": "beta"
+    },
+    {
+      "id": "case-retrospective",
+      "kind": "skills",
+      "description": "案件回顾与复盘技术 — 完结案件的多维度复盘框架，聚焦调查员能力、经验、逻辑与方法。由用户显式触发，独立于案件调查流程，目标为提升调查员觉知",
+      "paths": [
+        "skills/case-retrospective"
+      ],
+      "targets": [
+        "claude",
+        "claude-project"
+      ],
+      "dependencies": [
+        "case-management",
+        "evidence-management",
+        "investigation-memory"
+      ],
+      "defaultInstall": false,
+      "cost": "light",
+      "stability": "beta"
+    }
+  ]
+}

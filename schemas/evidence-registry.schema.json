@@ -1,0 +1,265 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cc-investigation:schemas:evidence-registry",
+  "title": "证据注册表",
+  "description": "evidence_registry.json 是案件证据的结构化核心登记文件。负责：节点发现（chain_nodes 索引）、实体管理（entities）、假设追踪（hypotheses）、事件时间线（event_timeline）。关系图（谁推导自谁、谁支撑谁、谁反驳谁）由 nodes/ 目录中各节点文件的 relations 字段声明，不在此 JSON 中维护副本。由 evidence-management/SKILL.md 管理完整字段说明。",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "case_id": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "last_updated": { "type": "string", "format": "date-time" },
+        "knowledge_openness": {
+          "type": "object",
+          "description": "已知证据缺口和知识完备性标记。反映调查中'我们还不知道什么'，使开放世界假设在数据结构层面显式化。",
+          "properties": {
+            "known_gaps": { "type": "integer", "minimum": 0, "description": "已知证据缺口计数" },
+            "data_completeness": {
+              "type": "string",
+              "enum": ["partial", "comprehensive", "closed"],
+              "default": "partial",
+              "description": "数据完备性：partial（不完整）、comprehensive（已得数据基本覆盖关键问题）、closed（已知缺口均已处理或评估）"
+            },
+            "known_unknowns": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "已知不确定性描述列表，如'是否还有未发现的关联账户'"
+            }
+          },
+          "required": ["known_gaps", "data_completeness"]
+        }
+      },
+      "required": ["case_id", "generated_at"]
+    },
+    "chain_nodes": {
+      "type": "array",
+      "description": "全案件节点索引。记录 nodes/ 目录中每个节点的 ID、类型和状态，作为图的可发现性入口。不包含关系信息——关系（derived_from/supports/contradicts 等）仅在 nodes/*.md 的 relations 字段中声明。新增节点时同步追加此条目，scan-chain.sh 可用 --sync 校验完整性。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "pattern": "^(EV|LS|ARG|FND|ENT|HYP|EVT)-\\d{3,}$" },
+          "type": {
+            "type": "string",
+            "enum": ["evidence", "clue", "argument", "finding", "entity", "hypothesis", "event"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "ready", "superseded"],
+            "default": "draft"
+          }
+        },
+        "required": ["id", "type"]
+      }
+    },
+    "entities": {
+      "type": "array",
+      "description": "涉案实体（人员、公司、项目等）。每个实体在 nodes/ 中有对应的 ENT-NNN 文件做详细信息。此数组为结构化摘要。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "entity_id": { "type": "string", "pattern": "^ENT-\\d{3,}$" },
+          "entity_type": {
+            "type": "string",
+            "enum": ["subject", "organization", "project", "account", "device", "other"]
+          },
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "intent_score": {
+            "type": "integer",
+            "description": "意图评分总分（仅 entity_type=subject 时适用）。由 case-manager 在 REVIEWING 阶段按 intent-scoring.md 框架计算。"
+          },
+          "intent_level": {
+            "type": "string",
+            "enum": ["mastermind", "complicit", "inconclusive", "deceived"],
+            "description": "意图定性（仅 entity_type=subject 时适用）。"
+          },
+          "score_breakdown": {
+            "type": "array",
+            "description": "意图评分各分类明细（仅 entity_type=subject 时适用）。",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": { "type": "string" },
+                "weight": { "type": "integer" },
+                "evidence_count": { "type": "integer", "minimum": 1 },
+                "subtotal": { "type": "integer" }
+              }
+            }
+          },
+          "scored_at": { "type": "string", "format": "date-time", "description": "意图评分时间。" },
+          "scored_by": { "type": "string", "description": "执行评分的人员或 agent 名称。" },
+          "attributes": {
+            "type": "object",
+            "properties": {
+              "department": { "type": "string" },
+              "registration_no": { "type": "string" },
+              "registration_date": { "type": "string" }
+            },
+            "additionalProperties": true
+          }
+        },
+        "required": ["entity_id", "entity_type", "name"]
+      }
+    },
+    "evidence_items": {
+      "type": "array",
+      "description": "证据条目登记——每条证据的核心注册信息。证据的详细分析、提炼和关系声明由 nodes/ 中的 EV-NNN 文件承载。此数组仅为注册层，不含关系字段（关系见 nodes/ 中各文件的 relations 字段）。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": { "type": "string", "pattern": "^EV-\\d{3,}$" },
+          "type": {
+            "type": "string",
+            "enum": [
+              "system_data",
+              "documentary",
+              "digital_forensics",
+              "testimonial",
+              "physical",
+              "expert_opinion",
+              "state_transition_decision"
+            ]
+          },
+          "subtype": { "type": "string" },
+          "summary": { "type": "string" },
+          "source": { "type": "string" },
+          "collected_by": { "type": "string" },
+          "collected_at": { "type": "string", "format": "date-time" },
+          "location": { "type": "string" },
+          "hash": { "type": "string" },
+          "confidence": {
+            "type": "string",
+            "enum": ["confirmed", "probable", "suspected"],
+            "default": "probable"
+          },
+          "scoring_category": {
+            "type": "string",
+            "enum": [
+              "deliberate_planning",
+              "concealment",
+              "personal_gain",
+              "false_statement",
+              "non_cooperation",
+              "knowledge_withholding",
+              "repeated_violation",
+              "negligence",
+              "proactive_remediation"
+            ],
+            "description": "意图评分分类。由 evidence-analyzer 在登记证据时填写，供 REVIEWING 阶段计算 subject intent_score 使用。详见 case-management/references/intent-scoring.md。"
+          },
+          "probative_value": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "related_entities": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "interview_metadata": {
+            "type": "object",
+            "properties": {
+              "interview_type": { "type": "string" },
+              "role": { "type": "string" },
+              "probative_use": { "type": "string" },
+              "statement_quality": { "type": "string", "enum": ["high", "medium", "low"] },
+              "coherence": { "type": "string", "enum": ["high", "medium", "low"] },
+              "adversarial_flags": { "type": "array", "items": { "type": "string" } },
+              "major_defenses": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "state_transition": {
+            "type": "object",
+            "properties": {
+              "decision_type": {
+                "type": "string",
+                "enum": ["backtrack_to_pre_investigation", "supplement_evidence"]
+              },
+              "rationale": { "type": "string" },
+              "specific_gaps": { "type": "array", "items": { "type": "string" } },
+              "scope_changes": { "type": "array", "items": { "type": "string" } },
+              "supplement_plan": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "required": ["evidence_id", "type", "summary", "collected_at"]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "description": "事实认定结构化摘要。完整推理记录和关系声明见 nodes/FND-NNN.md。confidence 为 suspected 时触发 REVIEWING→FIELDWORK 回退。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_id": { "type": "string", "pattern": "^FND-\\d{3,}$" },
+          "statement": { "type": "string" },
+          "fraud_type": { "type": "string" },
+          "main_dispute_points": { "type": "array", "items": { "type": "string" } },
+          "alternative_explanations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "explanation": { "type": "string" },
+                "status": { "type": "string", "enum": ["open", "rejected", "retained_for_followup"] },
+                "response": { "type": "string" }
+              }
+            }
+          },
+          "defense_response_summary": { "type": "string" },
+          "confidence": {
+            "type": "string",
+            "enum": ["confirmed", "probable", "suspected"]
+          }
+        },
+        "required": ["finding_id", "statement", "confidence"]
+      }
+    },
+    "event_timeline": {
+      "type": "array",
+      "description": "被调查事件时间序列。由 AI 在登记证据时自动提取。每条事件的详细描述和关联关系见 nodes/EVT-NNN.json 的 relations 字段。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event_id": { "type": "string", "pattern": "^EVT-\\d{3,}$" },
+          "title": { "type": "string" },
+          "moment": { "type": "string" },
+          "time_type": {
+            "type": "string",
+            "enum": ["exact", "range", "approximate", "inferred"]
+          },
+          "time_range": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": { "type": "string" },
+          "inferred": { "type": "boolean", "default": false },
+          "inference_basis": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["event_id", "title", "moment", "time_type"]
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "description": "竞争假设。关系（支撑/反驳）仅由 nodes/HYP-NNN.json 的 relations 字段声明，此处不维护副本。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "hypothesis_id": { "type": "string", "pattern": "^HYP-\\d{3,}$" },
+          "statement": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "status": { "type": "string", "enum": ["active", "rejected", "confirmed"] },
+          "alternative_hypotheses_addressed": { "type": "array", "items": { "type": "string" } },
+          "last_updated_at": { "type": "string", "format": "date-time" },
+          "last_updated_by": { "type": "string" }
+        },
+        "required": ["hypothesis_id", "statement", "status"]
+      }
+    }
+  },
+  "required": ["metadata", "chain_nodes", "entities", "evidence_items", "findings", "hypotheses", "event_timeline"]
+}

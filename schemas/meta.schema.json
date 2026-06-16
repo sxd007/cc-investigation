@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cc-investigation:schemas:meta",
+  "title": "案件元数据",
+  "description": "每个案件的 meta.json 必须遵循此结构。初始化时只需填写必填字段，其余字段随调查推进逐步填充。详见 case-management/SKILL.md § 数据结构。",
+  "type": "object",
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^INV-\\d{6}-\\d{2,}$",
+      "description": "案件编号，格式 INV-202606-01（INV + 年月 + 当月序号）。全局唯一。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["INIT", "PRE_INVESTIGATION", "FIELDWORK", "REVIEWING", "SUSPENDED", "ABANDONED", "CLOSED"],
+      "description": "案件当前所处阶段。字段值按阶段推进单向演进（SUSPENDED 可恢复至挂起前状态）。"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": ["whistleblowing", "data_driven", "case_expansion", "other"],
+      "description": "案件触发路径，决定初始调查重点。"
+    },
+    "parent_case_id": {
+      "type": "string",
+      "pattern": "^INV-\\d{6}-\\d{2,}$"
+    },
+    "case_title": { "type": "string", "description": "案件名称或标题，便于识别。" },
+    "created_by": { "type": "string", "description": "案件创建人（调查员 ID 或姓名）。" },
+    "created_at": { "type": "string", "format": "date-time", "description": "案件创建时间（ISO 8601）。" },
+    "last_activity": { "type": "string", "format": "date-time", "description": "最后活动时间戳。" },
+    "version": { "type": "integer", "minimum": 1, "default": 1, "description": "乐观锁版本号。" },
+    "sla": {
+      "type": "object",
+      "description": "SLA 时间配置。",
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "deadlines": {
+          "type": "object",
+          "properties": {
+            "pre_investigation_due": { "type": "string", "format": "date-time" },
+            "fieldwork_due": { "type": "string", "format": "date-time" },
+            "review_due": { "type": "string", "format": "date-time" }
+          }
+        }
+      }
+    },
+    "investigation_objectives": {
+      "type": "object",
+      "description": "调查目标定义。",
+      "properties": {
+        "generic_objectives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "objective_id": { "type": "string", "pattern": "^GO-\\d+$" },
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "applicable_fraud_types": { "type": "array", "items": { "type": "string" } },
+              "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "not_applicable"], "default": "pending" }
+            }
+          }
+        },
+        "specific_objectives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "objective_id": { "type": "string", "pattern": "^SO-\\d+$" },
+              "question": { "type": "string", "description": "要回答的核心问题" },
+              "related_hypothesis_id": { "type": "string" },
+              "required_evidence_types": { "type": "array", "items": { "type": "string" } },
+              "status": { "type": "string", "enum": ["pending", "in_progress", "answered", "unresolved"], "default": "pending" },
+              "answer_summary": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "suspend_info": {
+      "type": "object",
+      "description": "案件挂起记录。",
+      "properties": {
+        "suspended_from": { "type": "string", "enum": ["INIT", "PRE_INVESTIGATION", "FIELDWORK", "REVIEWING"] },
+        "suspended_at": { "type": "string", "format": "date-time" },
+        "suspend_reason": { "type": "string" },
+        "hold_lifted_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "abandon_info": {
+      "type": "object",
+      "description": "案件放弃记录。",
+      "properties": {
+        "abandoned_at": { "type": "string", "format": "date-time" },
+        "abandon_reason": { "type": "string" }
+      }
+    }
+  },
+  "required": ["case_id", "status", "trigger_type", "created_at"]
+}

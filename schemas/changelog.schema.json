@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cc-investigation:schemas:changelog",
+  "title": "案件变更记录（CHANGELOG）",
+  "description": "案件全生命周期中所有生成物的变更清单——每当证据注册表、元数据、checklist、产出文档等发生有意义的变化时，自动追加一条变更记录。相当于 git commit message 的轻量替代。",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "case_id": { "type": "string" },
+        "total_entries": { "type": "integer", "minimum": 0 },
+        "last_entry_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["case_id", "total_entries", "last_entry_at"]
+    },
+    "entries": {
+      "type": "array",
+      "description": "变更条目。按时间升序排列，每次追加一条，不应该修改已有条目。",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^CHG-\\d{3,}$",
+            "description": "格式 CHG-NNN，全局递增"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "变更发生时间"
+          },
+          "target": {
+            "type": "string",
+            "enum": ["meta.json", "evidence_registry.json", "checklist.yaml", "产出文档"],
+            "description": "变更发生的目标文件/数据结构"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "case_created",
+              "status_set",
+              "scope_defined",
+              "phase_transition",
+              "phase_backtrack",
+              "gate_all_passed",
+              "gate_item_completed",
+              "evidence_registry_initialized",
+              "evidence_registered",
+              "evidence_confidence_updated",
+              "finding_confidence_updated",
+              "hypothesis_status_changed",
+              "hypothesis_confidence_updated",
+              "hypothesis_generated",
+              "report_drafted",
+              "report_completed",
+              "document_generated",
+              "case_suspended",
+              "case_resumed",
+              "case_abandoned",
+              "case_closed",
+              "supplement_evidence_triggered",
+              "other"
+            ],
+            "description": "变更动作类型。只记录「有人会回头查」的有意义变更。"
+          },
+          "summary": {
+            "type": "string",
+            "description": "变更摘要（一句话，类似 git commit message）"
+          },
+          "detail": {
+            "type": "string",
+            "description": "变更细节（为什么变、什么触发的），可选但推荐"
+          },
+          "triggered_by": {
+            "type": "string",
+            "description": "触发者（具体 agent 名称 / 调查员 / 联合）"
+          },
+          "confirmed_by": {
+            "type": "string",
+            "description": "人工确认者（仅需人工确认的决策类变更必填）"
+          },
+          "related_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "关联的 ID 列表（如 EV-NNN、FND-NNN、HYP-NNN、CHK-xxx）"
+          }
+        },
+        "required": ["id", "timestamp", "action", "summary", "triggered_by"]
+      }
+    }
+  },
+  "required": ["metadata", "entries"]
+}

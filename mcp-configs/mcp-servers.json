@@ -1,0 +1,148 @@
+{
+  "mcpServers": {
+    "investigation-pdf": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-pdf"],
+      "description": "【PDF文档分析—自动部署】读取合同、发票、报告等PDF文件，提取文本和元数据。用于证据文件分析和文档审查。无需API Key，自动在 .mcp.json 中注册。",
+      "recommendedFor": ["evidence-management", "writing-reporting", "data-analysis"],
+      "integrationCheck": "读取PDF文件提取文本",
+      "fallback": "直接阅读PDF文件",
+      "deploy": "auto",
+      "_status": "real"
+    }
+  },
+  "builtin": {
+    "description": "以下能力已内置于 Claude Code，无需额外配置 MCP 服务器即可使用。",
+    "capabilities": {
+      "web_search": {
+        "description": "WebSearch 工具 — 互联网搜索，用于OSINT公开信息检索、背景调查",
+        "investigation_scenarios": ["背景调查", "供应商查询", "行业信息收集", "新闻报道查找"],
+        "deploy": "builtin"
+      },
+      "web_fetch": {
+        "description": "WebFetch 工具 — 抓取网页内容，用于获取公开网页信息",
+        "investigation_scenarios": ["网页证据固定", "公开信息核实", "在线文档读取"],
+        "deploy": "builtin"
+      },
+      "chrome_devtools": {
+        "description": "Chrome DevTools MCP — 浏览器自动化（截图、点击、表单填写、控制台等），已通过 ecc 插件加载",
+        "investigation_scenarios": ["网页证据截图", "自动化数据采集", "页面交互操作"],
+        "deploy": "builtin"
+      },
+      "sequential_thinking": {
+        "description": "Sequential Thinking — 分步推理，用于调查假设推演、证据链逻辑验证、时间线推断，已通过 cc-investigation 插件加载",
+        "investigation_scenarios": ["多重竞争假设分析", "因果关系推理", "证据链逻辑验证"],
+        "deploy": "builtin"
+      },
+      "file_system": {
+        "description": "Read/Write/Edit 工具 — 文件读写编辑，已内置于 Claude Code",
+        "investigation_scenarios": ["底稿文件编辑", "证据文件读取", "报告撰写"],
+        "deploy": "builtin"
+      }
+    }
+  },
+  "user_configurable": {
+    "description": "以下 MCP 服务器需要用户自行配置（添加到项目 .mcp.json 或 ~/.claude.json）。需要API Key的已标注获取方式。",
+    "servers": {
+      "investigation-fs": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/evidence"],
+        "description": "【证据文件系统】提供文件读写/目录列表/搜索工具。限定访问证据目录。需配置路径。",
+        "recommendedFor": ["evidence-management", "writing-reporting", "case-management"],
+        "setupGuide": "将 /path/to/evidence 替换为实际证据目录路径",
+        "fallback": "手动指定文件路径",
+        "auth": "none",
+        "difficulty": "简单"
+      },
+      "investigation-reasoning": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+        "description": "【结构化推理】提供 sequential_thinking 工具。用于假设推演、证据链逻辑验证。注意：cc-investigation 插件已内置此工具，仅在需要独立 MCP 服务时配置。",
+        "recommendedFor": ["investigation-foundation", "fraud-classification", "evidence-management"],
+        "fallback": "使用插件内置的推理工具",
+        "auth": "none",
+        "difficulty": "简单"
+      },
+      "brave-search": {
+        "command": "npx",
+        "args": ["-y", "@brave/brave-search-mcp-server"],
+        "env": { "BRAVE_API_KEY": "your-api-key-here" },
+        "description": "【Brave 搜索】提供网页/图片/视频/新闻搜索。比内置 WebSearch 更深入的结构化搜索结果。免费额度：2000次/月。",
+        "recommendedFor": ["investigation-techniques", "fraud-classification"],
+        "setupGuide": "1. 访问 https://brave.com/search/api/ 注册获取免费 API Key 2. 替换 your-api-key-here",
+        "fallback": "使用内置 WebSearch 工具",
+        "auth": "BRAVE_API_KEY（免费）",
+        "difficulty": "简单"
+      },
+      "baidu-map": {
+        "command": "npx",
+        "args": ["-y", "@baidumap/mcp-server-baidu-map"],
+        "env": { "BAIDU_MAP_API_KEY": "your-api-key-here" },
+        "description": "【百度地图】提供地理编码、地点搜索、路线规划等。用于调查中的地理位置分析、地址核验。",
+        "recommendedFor": ["investigation-techniques"],
+        "setupGuide": "1. 访问 https://lbsyun.baidu.com/ 注册百度地图开放平台 2. 创建应用获取API Key",
+        "fallback": "浏览器手动查询百度地图",
+        "auth": "百度地图API Key（免费）",
+        "difficulty": "简单"
+      },
+      "baidu-search": {
+        "command": "npx",
+        "args": ["-y", "@alex.ss/mcp-server-baidu-search"],
+        "description": "【百度搜索】让AI可以直接搜索中文互联网。适合中文环境下的OSINT调查。",
+        "recommendedFor": ["investigation-techniques", "fraud-classification"],
+        "fallback": "浏览器手动搜索百度",
+        "auth": "无需额外API Key",
+        "difficulty": "简单"
+      }
+    }
+  },
+  "placeholder": {
+    "description": "以下 MCP 类型在调查场景中有明确需求，但目前没有经过验证的成熟包。有新包发布后可接入。",
+    "servers": {
+      "investigation-excel": {
+        "description": "【财务数据分析】提供 Excel 读取、Benford 定律分析、趋势分析。用于导入财务数据进行异常检测。",
+        "fallback": "手动审查 Excel 数据，或使用 Claude 直接分析 CSV",
+        "recommendedFor": ["data-analysis", "fraud-classification"]
+      },
+      "investigation-charts": {
+        "description": "【可视化图表生成】提供资金流向图（Sankey）、关系图谱、时间线图、热力图等。",
+        "fallback": "使用文本表格描述图表建议",
+        "recommendedFor": ["data-analysis", "writing-reporting"]
+      },
+      "investigation-sentiment": {
+        "description": "【文本语言分析】访谈笔录的语言特征分析、SCAN方法辅助、情绪波动检测。",
+        "fallback": "使用 SCAN 方法由模型直接分析",
+        "recommendedFor": ["interview-analysis"]
+      },
+      "investigation-email": {
+        "description": "【邮件取证分析】解析邮件头、分析元数据、关键词搜索、时间线重建。",
+        "fallback": "使用文本编辑器手动查看邮件文件",
+        "recommendedFor": ["investigation-techniques", "evidence-management"]
+      },
+      "investigation-registry": {
+        "description": "【企业信息查询】工商注册信息查询、股权结构分析、关联公司发现。",
+        "fallback": "浏览器手动查询工商信息网站",
+        "recommendedFor": ["fraud-classification", "investigation-techniques"]
+      }
+    }
+  },
+  "deployment_map": {
+    "description": "各 MCP 的部署方式一览",
+    "map": [
+      { "name": "investigation-pdf", "deploy": "自动部署（.mcp.json）", "auth": "无需API Key" },
+      { "name": "浏览/搜索/文件/推理", "deploy": "Claude Code 内置", "auth": "无需API Key" },
+      { "name": "investigation-fs", "deploy": "用户手动配置", "auth": "无需API Key" },
+      { "name": "brave-search", "deploy": "用户手动配置", "auth": "BRAVE_API_KEY（免费，2000次/月）" },
+      { "name": "baidu-map", "deploy": "用户手动配置", "auth": "百度地图API Key" },
+      { "name": "baidu-search", "deploy": "用户手动配置", "auth": "无需额外API Key" },
+      { "name": "investigation-excel（占位）", "deploy": "待社区包就绪", "auth": "待定" },
+      { "name": "investigation-charts（占位）", "deploy": "待社区包就绪", "auth": "待定" }
+    ]
+  },
+  "_docs": {
+    "purpose": "cc-investigation MCP 完整能力目录。auto-deploy 的服务器已注册到 .mcp.json 自动加载；builtin 是 Claude Code 内置能力无需配置；user_configurable 需要用户自行添加到 .mcp.json 或 ~/.claude.json。",
+    "usage": "调查员参考此目录了解可用的 MCP 能力，然后运行 /cc-investigation:cold-start-interview --check-integrations 检查当前环境状态。",
+    "risk_warning": "涉及敏感调查数据的 MCP（如 investigation-db、investigation-fs）务必限定访问范围，避免泄露案件数据。",
+    "key_design": "所有技能引用 MCP 时按能力类型描述（如'PDF分析工具'），不写具体工具名。此目录是唯一的 MCP 名称到能力类型的映射记录。"
+  }
+}

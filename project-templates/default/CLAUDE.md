@@ -1,0 +1,326 @@
+# 项目概述
+
+本项目是反舞弊调查案件工作目录，基于 **cc-investigation** 工具包开展调查工作。所有案件数据存放在 `cases/` 目录下。
+
+> 本文件的作用：指导 AI（Claude Code）在办理调查案件时的操作方式——什么阶段该参考什么技能、什么规则必须遵守、什么陷阱要避免。这不是编排脚本，不定义自动执行链。它是 AI 自主决策时的上下文支持。
+
+**工作底稿模板位于 `templates/` 目录**，联系举报人、撰写情报摘要等场景可参考使用。模板文件头内含技能导航注释，AI 在加载对应模板时会读取并提示应加载的辅助技能。
+
+---
+
+## ⚠️ 核心工作准则（AI 必读）
+
+### 0. AI 的定位：辅助性工具
+
+AI **必须始终清楚**自己的定位：
+- **帮助探索** — 提供多角度分析，但不替调查员判断"什么值得查"
+- **帮助分析** — 提供结构化框架和方法论，但不替调查员决定"结论是什么"
+- **帮助批判** — 提供反向假设推演和认知偏差提醒，但不替调查员做出"采信与否"的决定
+
+**AI 不能替代调查员的独立判断。** 最终调查结论的责任主体始终是调查员及其所属机构。
+
+### 1. 基本红线
+
+- **拒绝**任何未经授权的监控、跟踪、人肉搜索或数据采集
+- **拒绝**生成伪造证据、误导性报告
+- 通过 MCP 获取数据时，**先确认**用户对该数据源拥有合法访问权限
+- 任何涉及法律判断、证据可采性或人员可信度评分的输出，附带"仅供参考，需专业人士核实"警示
+- 主动建议对个人数据进行脱敏处理
+
+---
+
+## 一、插件能力参考
+
+本插件（cc-investigation）为调查工作提供三个层次的能力：**技能**（领域知识+方法论）、**命令**（快捷入口）、**代理**（专项分析员）。以下为完整目录，AI 在办案过程中按需调用。
+
+### 1.1 技能体系
+
+| 技能 | 类别 | 用途 |
+|------|------|------|
+| `investigation-foundation` | 方法论 | 调查思维框架、假设驱动推理、认知偏差防范 |
+| `case-management` | 流程 | 案件生命周期、门禁控制、质量管控 |
+| `evidence-management` | 证据 | 证据链管理、保管链、可采性判断、ALCOA 原则 |
+| `data-analysis` | 分析 | COSO 框架、异常检测、Benford 定律、趋势分析 |
+| `order-execution-variance-analysis` | 分析 | 项目执行差异分析 — 合同流/货物流/资金流多维对比，通用链路核查工具 |
+| `investigation-techniques` | 技术 | 财务分析、数字取证、OSINT |
+| `writing-reporting` | 产出 | 报告结构、SCQA 公式、读者适配策略 |
+| `fraud-classification` | 分类 | 舞弊分类与路由，匹配线索到对应场景技能 |
+| `fraud-channel` | 场景 | 渠道舞弊：窜货、虚报终端客户、成本造假、拼单绑单、隐瞒渠道链路、隐瞒渠道利润 |
+| `fraud-reimbursement` | 场景 | 费用报销舞弊（虚构、篡改、重复报销） |
+| `fraud-procurement` | 场景 | 采购舞弊（围标串标、化整为零、虚假供应商等） |
+| `fraud-bid-rigging` | 场景 | 投标操纵（压标、陪标、轮标、信息泄露等） |
+| `fraud-ip` | 场景 | 知识产权舞弊（商业秘密、竞业违规、专利侵权） |
+| `fraud-hr` | 场景 | 人力资源舞弊（虚假员工、薪资操纵、招聘舞弊等） |
+| `fraud-fake-chop` | 场景 | 伪造印章（私刻、变造、盗用、冒用） |
+| `fraud-conflicts-of-interest` | 场景 | 利益冲突（采购/销售冲突、裙带关系、回扣关联） |
+| `interview-analysis` | 沟通 | PEACE 访谈策略、SCAN 陈述分析、对抗行为识别 |
+| `investigation-memory` | 归档 | 过程非结构化信息记录（不干扰案件推进） |
+| `case-retrospective` | 复盘 | 完结案件多维度复盘（用户显式触发） |
+| `mcp-integration` | 集成 | MCP 能力与技能的配合方式 |
+
+### 1.2 快捷命令
+
+| 命令 | 用途 |
+|------|------|
+| `/investigate` | 调查统一入口 — 新案立案、续案回顾、阶段导航 |
+| `/evidence` | 证据管理 — 添加、保管链追踪、可采性评估 |
+| `/interview` | 访谈策划与分析 — 提纲、笔录、SCAN 分析 |
+| `/report` | 报告撰写 — 底稿、备忘录、结案报告 |
+| `/analyze` | 数据分析 — 异常检测、趋势分析、关联分析 |
+| `/fraud-type` | 舞弊类型识别与调查方案推荐 |
+| `/case` | 多案件状态总览仪表盘 |
+| `/working-paper` | 底稿管理 — 创建、索引、复核 |
+
+### 1.3 专项代理
+
+| 代理 | 专长 | 典型调用场景 |
+|------|------|-------------|
+| `investigation-planner` | 调查方案设计 | 制定调查计划、生成假设、设计证据策略 |
+| `evidence-analyzer` | 证据评估 | 评估证据可采性、可靠性、充分性 |
+| `interview-analyzer` | 陈述分析 | 分析访谈笔录真实性、完整性、对抗行为 |
+| `report-writer` | 报告撰写 | 撰写结构化调查报告或简报 |
+| `fraud-type-classifier` | 舞弊分类 | 根据线索特征识别最可能的舞弊类型 |
+| `data-analyzer` | 数据分析 | 数据异常检测、Benford 分析、可视化 |
+
+### 1.4 技能加载策略
+
+AI 在以下时刻应主动加载对应技能：
+
+| 场景 | 加载的技能 |
+|------|-----------|
+| 收到举报/线索 | `fraud-classification` → 判断案件性质 |
+| 制定调查计划 | `investigation-foundation` → 假设驱动推理 |
+| 管理案件进展 | `case-management` → 阶段框架、门禁管控 |
+| 登记证据 | `evidence-management` → 保管链、可采性 |
+| 分析数据 | `data-analysis` → 异常检测方法 |
+| 链路对比分析 | `order-execution-variance-analysis` → 申报与执行记录结构化对比 |
+| 准备访谈 | `interview-analysis` → PEACE 模型、问题设计 |
+| 撰写报告 | `writing-reporting` → SCQA 结构、读者适配 |
+| 记录非正式信息 | `investigation-memory` → 后台创建 memory 条目 |
+| 案件完结后复盘 | `case-retrospective` → 七维度复盘框架（显式触发） |
+| 涉及特定舞弊 | 对应的 `fraud-*` 场景技能 |
+
+### 1.5 MCP 配合方式
+
+插件不绑定具体 MCP 工具。AI 根据可用环境自行判断：
+- 有搜索类 MCP → 可用于 OSINT 调查
+- 有数据库类 MCP → 可用于数据查询和分析
+- 有文件系统类 MCP → 可用于证据文件管理
+- 不可用时 → 直接完成分析（不报错、不阻塞）
+
+---
+
+## 二、案件生命周期与各阶段任务
+
+### INIT 阶段 — 线索接收与立案决策
+
+**目标**：判断线索是否值得进入正式调查。
+
+**必须完成的核心任务**：
+
+| 任务 | 产出物 | 参考技能 |
+|------|--------|---------|
+| 举报信息结构化提取 | `01_INIT/01_init_intelligence_summary.md` | — |
+| 案件性质判断 | 同上 §2 | `cc-investigation:fraud-classification` |
+| 信息缺口分析（IG-xx） | 同上 §4 | — |
+| 初步调查计划 | 同上 §5 | `cc-investigation:investigation-foundation` |
+| 核心假设建立 | 同上 §6 | `cc-investigation:investigation-foundation` |
+| 案件元数据创建 | `meta.json` | — |
+| 门禁清单创建 | `checklist.yaml` | — |
+| 证据注册表创建 | `evidence_registry.json` | `cc-investigation:evidence-management` |
+| 节点目录创建 | `nodes/`（EV-001、ENT-001、初始 HYP 节点） | `cc-investigation:evidence-management` |
+
+**领域特定知识**：如果案件涉及具体舞弊类型（渠道窜货、采购舞弊等），加载对应的 `cc-investigation:fraud-*` 技能获取该领域的调查切入点和信号模式。
+
+### PRE_INVESTIGATION 阶段 — 静默情报收集
+
+**目标**：在静默条件下穷尽系统内可获取的情报。
+
+**产出物**：
+- `pre_investigation_brief.md`
+- `intelligence_summary.md`
+- `evidence_registry.json`（chain_nodes 追加、实体填充）
+- `nodes/`（追加 EV 节点、创建 LS 线索分析节点）
+- `meta.json`（补充 SLA、调查目标等字段）
+
+**适用技能**：`cc-investigation:data-analysis`
+
+### FIELDWORK 阶段 — 接触取证
+
+**目标**：接触当事人，获取系统外证据。
+
+**适用技能**：
+- `cc-investigation:interview-analysis`（访谈策略）
+- `cc-investigation:investigation-techniques`（调查技术）
+
+### REVIEWING 阶段 — 收敛定性
+
+**目标**：将全案证据收敛为事实认定。
+
+**产出物**：
+- `final_report.md`
+- `evidence_registry.json`（confidence 定型）
+- `nodes/`（创建 FND 节点、冻结所有节点）
+
+**适用技能**：`cc-investigation:writing-reporting`
+
+---
+
+## 三、举报处理特殊规则
+
+以下规则在案件处理中已反复验证，在处理举报来源案件时必须遵守：
+
+### 3.1 联系举报人前必须完成的步骤
+
+- [ ] 通过手机号/邮箱完成举报人背景核查（企查查/天眼查 → 公司关联 → 司法风险）
+- [ ] 评估结果决定通话策略后再安排通话
+
+### 3.2 通话纪律
+
+- ❌ 同一举报事项未经内部复盘，不得连续通话超过1次
+- ❌ 在获取可核查信息前，不得向举报人披露调查方法论细节
+- ✅ 每次通话后输出 `call_memo_*.md` 并完成通话评估
+- ✅ 通话评估包括：信息交换是否对等？/ 是否有警示信号？/ 策略是否需要调整？
+
+### 3.3 警示信号—暂停评估触发条件
+
+通话中出现以下任意信号时，安排下一次通话前必须暂停并重新评估：
+
+1. 对方要求全程录音
+2. 对方连续两次未提供约定的核心信息
+3. 对方主动追问调查流程、法律处置路径、报案策略
+4. 背景核查返回负面结果
+
+### 3.4 假设管理
+
+- ❌ 初始假设不得全部为正向假设（即"举报为真"类假设）
+- ✅ 必须至少包含一个反向假设（如"举报人动机不纯"/"举报不真实"）
+- ✅ 反向假设与正向假设同等优先级验证
+
+### 3.5 证据管理
+
+- ✅ 从收到举报信息的那一刻起，创建 `evidence_registry.json` 和 `nodes/` 目录
+- ✅ 第一项证据就是举报信息本身：在 evidence_registry.json 注册为 EV-001，在 `nodes/EV-001.md`（或 `.json`）中记录详细信息
+- ✅ **关系图仅通过 `nodes/` 中各文件的 `relations` 字段声明**（derived_from/supports/contradicts 等类型），不复制到 evidence_registry.json 中
+- ✅ 使用 `skills/evidence-management/scripts/scan-chain.py` 编译关系图、追溯链、检查完整性
+
+---
+
+## 四、案件文件结构规范
+
+### 3.1 项目目录结构
+
+```
+<project-root>/
+├── CLAUDE.md                          ← 本文件（调查操作指南）
+├── templates/                         ← 工作底稿模板
+│   └── contact_whistleblower_template.md
+│
+└── cases/
+    └── CASE-YYYY-NNN/
+        ├── README.md                  ← 案件目录索引
+        ├── meta.json                  ← 案件元数据
+        ├── checklist.yaml             ← 门禁清单
+        ├── evidence_registry.json     ← 证据注册表（结构化索引，不含关系字段）
+        ├── CHANGELOG.json             ← 变更记录
+        │
+        ├── nodes/                     ← 分析推理层（关系仅在此声明）
+        │   ├── EV-001.json
+        │   ├── LS-001.md
+        │   ├── ARG-001.md
+        │   ├── FND-001.md
+        │   └── ...
+        │
+        ├── raw/                       ← 原始证据文件（PDF、截图等）
+        │   └── EV-001.pdf
+        │
+        ├── 01_INIT/                   ← 立案阶段产物
+        ├── 02_PRE_INVESTIGATION/      ← 外围调查阶段产物
+        ├── 03_FIELDWORK/              ← 实地取证阶段产物
+        ├── 04_REVIEWING/              ← 收敛定性阶段产物
+        │
+        └── case_memory/               ← 过程记忆
+```
+
+### 3.2 命名规范
+
+| 规范 | 说明 |
+|------|------|
+| 阶段前缀目录 | `01_INIT/` ~ `04_REVIEWING/` — 按调查阶段组织 |
+| 序号前缀（阶段内） | `01_` `02_` `03_` — 表示推荐阅读顺序 |
+| 节点 ID | `EV-NNN` `LS-NNN` `ARG-NNN` `FND-NNN` — 类型前缀 + 3 位数字 |
+| 日期后缀 | 可能产生多个版本的文件（call_memo、closing_report）必须带 `_YYYYMMDD` |
+| 功能明确 | 文件名须能让人只看名字就知道文件用途 |
+
+### 3.3 跨文件索引要求
+
+每个文件必须在头部或尾部标明与其他文件的关系：
+
+```
+## 关联文件
+- 证据详情见 `nodes/EV-001.json`
+- 线索分析见 `nodes/LS-001.md`
+- 通话原始记录见 `03_FIELDWORK/02_call_memo_YYYYMMDD.md`
+```
+
+结案报告必须包含完整的案件文件清单并说明各文件用途。
+
+---
+
+## 五、质量管理
+
+### 5.1 写作质量标准
+
+| 维度 | 要求 |
+|------|------|
+| 信息源标注 | 所有 claim 必须标注来源类型（firsthand/relay/opinion/attitude） |
+| [举报人称] 标注 | 举报人提供的信息必须标注 `[举报人称]`，不得直接引用为已确立事实 |
+| 置信度标注 | suspected / likely / confirmed / not_applicable |
+| 双向索引 | 新增信息必须指回原定义文件 |
+
+### 5.2 结案前 Checklist
+
+- [ ] 所有已创建文件已互相索引
+- [ ] README.md 已更新
+- [ ] evidence_registry.json 存在且 chain_nodes 索引完整
+- [ ] nodes/ 目录包含全部证据链节点（LS → ARG → FND）
+- [ ] 证据链完整性检查通过（`skills/evidence-management/scripts/scan-chain.py --integrity` 无 ERROR）
+- [ ] 放弃/关闭理由已在 meta.json 中记录
+- [ ] 高风险目标已标注
+
+---
+
+## 六、案件阶段总览
+
+| 阶段 | 状态 | 门禁条件 | 产出物 |
+|------|------|---------|--------|
+| INIT | □ 未开始 / □ 进行中 / □ 完成 | 6 项 | intelligence_summary, meta.json, checklist.yaml, evidence_registry.json, nodes/ (EV-001, ENT, HYP) |
+| PRE_INVESTIGATION | □ 未开始 / □ 进行中 / □ 完成 | 5 项 | pre_investigation_brief, nodes/ (EV, LS) |
+| FIELDWORK | □ 未开始 / □ 进行中 / □ 完成 | 6 项（含 evidence_chain_integrity） | 访谈笔录、调取证据、nodes/ (ARG) |
+| REVIEWING | □ 未开始 / □ 进行中 / □ 完成 | 4 项 | final_report, nodes/ (FND 冻结) |
+
+---
+
+## 七、入门引导
+
+### 首次使用
+
+1. 运行 `/cc-investigation:cold-start-interview` 完成团队配置（一次配置，长期有效）
+2. 运行 `/investigate new` 启动第一个案件
+
+### 日常使用
+
+```
+/investigate status         ← 查看当前案件进度
+/investigate new            ← 启动新案件
+/investigate continue 001   ← 继续已有案件
+```
+
+---
+
+## 八、相关资源
+
+- **各技能 SKILL.md** — 在 `skills/` 目录下，提供完整的领域知识和判断标准
+- **证据规则** — `rules/evidence-rules.md`
+- **底稿标准** — `rules/working-paper-standards.md`
+- **案例数据模型** — `docs/case-data-model.md`

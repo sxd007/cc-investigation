@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cc-investigation:schemas:checklist",
+  "title": "阶段门禁清单",
+  "description": "checklist.yaml 记录各阶段完成状态，作为阶段推进的门禁依据。每个阶段包含一组必选条件，全部满足后方可推进至下一阶段。详见 case-management/SKILL.md § 数据结构。",
+  "type": "object",
+  "properties": {
+    "init": {
+      "type": "object",
+      "description": "INIT 阶段门禁。",
+      "properties": {
+        "completed": { "type": "boolean", "default": false },
+        "case_opened": { "type": "boolean", "default": false, "description": "已完成 Go/No-Go 决策" },
+        "objectives_defined": { "type": "boolean", "default": false },
+        "key_entities_verified": { "type": "boolean", "default": false },
+        "information_gaps_documented": { "type": "boolean", "default": false },
+        "case_nature_assessed": { "type": "boolean", "default": false },
+        "investigation_plan_drafted": { "type": "boolean", "default": false }
+      }
+    },
+    "pre_investigation": {
+      "type": "object",
+      "description": "PRE_INVESTIGATION 阶段门禁。",
+      "properties": {
+        "completed": { "type": "boolean", "default": false },
+        "trigger_type_confirmed": { "type": "boolean", "default": false },
+        "intelligence_summary_completed": { "type": "boolean", "default": false },
+        "evidence_gap_assessed": { "type": "boolean", "default": false },
+        "scope_defined": { "type": "boolean", "default": false },
+        "evidence_preservation_risk": { "type": "string", "enum": ["low", "medium", "high"] },
+        "intel_items": {
+          "type": "object",
+          "description": "各项情报需求获取状态。key 为需求编号（如 IR-01），value 为状态。具体字段由各领域场景自定义。",
+          "additionalProperties": { "type": "string", "enum": ["completed", "fallback_used", "unavailable", "not_applicable"] }
+        }
+      }
+    },
+    "fieldwork": {
+      "type": "object",
+      "description": "FIELDWORK 阶段门禁。",
+      "properties": {
+        "completed": { "type": "boolean", "default": false },
+        "contacted_subjects": { "type": "boolean", "default": false },
+        "upload_ratio": { "type": "number", "minimum": 0, "maximum": 1 },
+        "interviews_completed": { "type": "array", "items": { "type": "string" } },
+        "digital_forensics_done": { "type": "boolean", "default": false },
+        "contact_data_obtained": { "type": "string", "enum": ["obtained", "refused", "unavailable", "not_required"] },
+        "statement_quality_reviewed": { "type": "boolean", "default": false },
+        "adversarial_behavior_assessed": { "type": "boolean", "default": false },
+        "pending_items": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "reviewing": {
+      "type": "object",
+      "description": "REVIEWING 阶段门禁。",
+      "properties": {
+        "completed": { "type": "boolean", "default": false },
+        "conclusion_drafted": { "type": "boolean", "default": false },
+        "suspected_findings_resolved": { "type": "boolean", "default": false },
+        "subject_intent_scored": { "type": "boolean", "default": false },
+        "major_defenses_responded": { "type": "boolean", "default": false },
+        "alternative_explanations_reviewed": { "type": "boolean", "default": false },
+        "decision_rationale": { "type": "string" }
+      }
+    }
+  },
+  "required": ["init", "pre_investigation", "fieldwork", "reviewing"]
+}

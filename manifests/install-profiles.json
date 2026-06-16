@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "profiles": {
+    "minimal": {
+      "description": "最小基线 — 调查准则、代理、命令、平台配置，无领域技能",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "cold-start-interview"
+      ]
+    },
+    "investigator": {
+      "description": "调查员模式 — 适合一线反舞弊调查人员，覆盖从报案到结案全流程",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "investigation-foundation",
+        "fraud-classification",
+        "investigation-techniques",
+        "evidence-management",
+        "interview-analysis",
+        "writing-reporting",
+        "case-management",
+        "mcp-integration",
+        "cold-start-interview",
+        "fraud-reimbursement",
+        "fraud-procurement",
+        "fraud-bid-rigging",
+        "fraud-channel",
+        "fraud-ip",
+        "fraud-hr",
+        "fraud-fake-chop",
+        "fraud-conflicts-of-interest"
+      ]
+    },
+    "auditor": {
+      "description": "审计师模式 — 适合内审人员，侧重数据分析、流程审计和合规检查",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "investigation-foundation",
+        "data-analysis",
+        "evidence-management",
+        "writing-reporting",
+        "mcp-integration",
+        "cold-start-interview"
+      ]
+    },
+    "analyst": {
+      "description": "分析师模式 — 侧重数据挖掘、异常检测和可视化呈现",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "investigation-foundation",
+        "data-analysis",
+        "writing-reporting",
+        "mcp-integration",
+        "cold-start-interview"
+      ]
+    },
+    "interviewer": {
+      "description": "访谈专家模式 — 侧重问话技巧、陈述分析和证言评估",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "investigation-foundation",
+        "interview-analysis",
+        "evidence-management",
+        "writing-reporting",
+        "mcp-integration",
+        "cold-start-interview"
+      ]
+    },
+    "full": {
+      "description": "全量安装 — 所有调查技能模块",
+      "modules": [
+        "rules-core",
+        "agents-core",
+        "commands-core",
+        "platform-configs",
+        "investigation-foundation",
+        "fraud-classification",
+        "investigation-techniques",
+        "evidence-management",
+        "interview-analysis",
+        "data-analysis",
+        "writing-reporting",
+        "case-management",
+        "mcp-integration",
+        "cold-start-interview",
+        "fraud-reimbursement",
+        "fraud-procurement",
+        "fraud-bid-rigging",
+        "fraud-channel",
+        "fraud-ip",
+        "fraud-hr",
+        "fraud-fake-chop",
+        "fraud-conflicts-of-interest"
+      ]
+    }
+  }
+}

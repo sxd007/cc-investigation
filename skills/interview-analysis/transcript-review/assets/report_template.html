@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>谈话笔录分析报告</title>
+<style>
+/* ── reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.6; color: #1a1a1a; background: #f5f4f0; }
+
+/* ── layout ── */
+.page { max-width: 1200px; margin: 0 auto; padding: 24px 20px; }
+.report-header { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.report-title { font-size: 16px; font-weight: 500; color: #1a1a1a; margin-bottom: 6px; }
+.meta-grid { display: flex; gap: 20px; flex-wrap: wrap; }
+.meta-item { font-size: 12px; color: #666; }
+.meta-item span { color: #1a1a1a; font-weight: 500; }
+.round-badge { flex-shrink: 0; background: #eeedfe; color: #534ab7; font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 20px; }
+
+/* ── main grid ── */
+.main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.panel { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; overflow: hidden; }
+.panel-header { padding: 10px 16px; border-bottom: 0.5px solid #eee; font-size: 11px; font-weight: 500; color: #888; letter-spacing: 0.05em; background: #fafaf8; display: flex; align-items: center; gap: 6px; }
+.panel-body { padding: 14px 16px; max-height: 520px; overflow-y: auto; }
+
+/* ── qa blocks ── */
+.qa-block { margin-bottom: 12px; border: 0.5px solid #e5e5e5; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+.qa-block:last-child { margin-bottom: 0; }
+.qa-block:hover { border-color: #bbb; }
+.qa-block.highlighted { border-color: #378add; background: #f0f7ff; }
+.qa-label { font-size: 10px; font-weight: 500; color: #aaa; letter-spacing: 0.06em; padding: 5px 12px; background: #fafaf8; border-bottom: 0.5px solid #eee; }
+.qa-q { padding: 8px 12px; font-size: 12px; color: #666; background: #fafaf8; }
+.qa-a { padding: 10px 12px; font-size: 13px; color: #1a1a1a; line-height: 1.65; }
+
+/* ── inline marks ── */
+.mark { display: inline; border-radius: 3px; padding: 1px 3px; cursor: pointer; transition: opacity 0.1s; }
+.mark:hover { opacity: 0.75; }
+.mark-vague  { background: #faeeda; color: #854f0b; }
+.mark-gap    { background: #faece7; color: #993c1d; }
+.mark-resist { background: #fbeaf0; color: #993556; }
+
+/* ── annotation cards ── */
+.anno-col { padding: 14px 16px; max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.section-label { font-size: 10px; font-weight: 500; color: #aaa; letter-spacing: 0.06em; margin-top: 6px; margin-bottom: 2px; }
+.anno-card { border: 0.5px solid #e5e5e5; border-radius: 8px; padding: 10px 12px; font-size: 12px; line-height: 1.5; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.anno-card:hover { border-color: #bbb; }
+.anno-card.active { border-color: #378add; box-shadow: 0 0 0 2px #e6f1fb; }
+.anno-card.vague  { border-left: 3px solid #ef9f27; border-radius: 0 8px 8px 0; }
+.anno-card.gap    { border-left: 3px solid #d85a30; border-radius: 0 8px 8px 0; }
+.anno-card.resist { border-left: 3px solid #d4537e; border-radius: 0 8px 8px 0; }
+.anno-type { font-size: 10px; font-weight: 500; letter-spacing: 0.05em; margin-bottom: 4px; }
+.anno-type.vague  { color: #854f0b; }
+.anno-type.gap    { color: #993c1d; }
+.anno-type.resist { color: #993556; }
+.anno-quote { color: #888; font-style: italic; border-left: 2px solid #e5e5e5; padding-left: 8px; margin-bottom: 4px; font-size: 12px; }
+.anno-note  { color: #1a1a1a; }
+.anno-env   { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+/* ── summary panel ── */
+.summary-panel { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; overflow: hidden; }
+.tab-bar { display: flex; border-bottom: 0.5px solid #eee; background: #fafaf8; }
+.tab-btn { padding: 9px 16px; font-size: 12px; font-weight: 400; color: #888; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: color 0.15s; }
+.tab-btn.active { color: #1a1a1a; border-bottom-color: #378add; font-weight: 500; }
+.tab-content { padding: 16px; display: none; }
+.tab-content.active { display: block; }
+
+/* ── overview ── */
+.metric-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.metric-card { background: #fafaf8; border-radius: 8px; padding: 12px; text-align: center; }
+.metric-label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.metric-value { font-size: 20px; font-weight: 500; color: #1a1a1a; }
+.metric-sub   { font-size: 11px; color: #aaa; margin-top: 2px; }
+.chain-note { font-size: 12px; color: #555; line-height: 1.65; }
+
+/* ── hypotheses ── */
+.hypo-table { width: 100%; border-collapse: collapse; }
+.hypo-table th { font-size: 11px; font-weight: 500; color: #aaa; letter-spacing: 0.04em; text-align: left; padding: 0 8px 8px 0; border-bottom: 0.5px solid #eee; }
+.hypo-table td { padding: 10px 8px 10px 0; vertical-align: top; border-bottom: 0.5px solid #f0f0f0; font-size: 12px; line-height: 1.55; color: #444; }
+.hypo-table tr:last-child td { border-bottom: none; }
+.hypo-name { font-weight: 500; color: #1a1a1a; margin-bottom: 2px; }
+.badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 2px 9px; border-radius: 20px; letter-spacing: 0.04em; white-space: nowrap; }
+.badge.strengthen { background: #eaf3de; color: #3b6d11; }
+.badge.neutral    { background: #f1efe8; color: #5f5e5a; }
+.badge.weaken     { background: #fcebeb; color: #a32d2d; }
+.hypo-has   { color: #3b6d11; }
+.hypo-lacks { color: #a32d2d; }
+
+/* ── multi-round ── */
+.mr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mr-card { background: #fafaf8; border-radius: 8px; padding: 12px; font-size: 12px; }
+.mr-card-label { font-size: 10px; font-weight: 500; color: #aaa; letter-spacing: 0.05em; margin-bottom: 6px; }
+.mr-card-value { color: #1a1a1a; line-height: 1.55; }
+
+/* ── actions ── */
+.action-list { display: flex; flex-direction: column; gap: 6px; }
+.action-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 0.5px solid #f0f0f0; font-size: 12px; line-height: 1.55; }
+.action-item:last-child { border-bottom: none; }
+.action-tag { flex-shrink: 0; font-size: 10px; font-weight: 500; padding: 2px 9px; border-radius: 20px; letter-spacing: 0.04em; margin-top: 1px; }
+.action-tag.a { background: #e6f1fb; color: #185fa5; }
+.action-tag.b { background: #eeedfe; color: #534ab7; }
+.action-text { color: #1a1a1a; }
+
+/* ── legend ── */
+.legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 9px 16px; border-bottom: 0.5px solid #eee; background: #fafaf8; font-size: 11px; color: #888; align-items: center; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.dot-vague  { background: #ef9f27; }
+.dot-gap    { background: #d85a30; }
+.dot-resist { background: #d4537e; }
+.legend-hint { margin-left: auto; font-size: 11px; color: #bbb; }
+
+@media (max-width: 700px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: repeat(3, 1fr); }
+  .mr-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ① 报告头部 -->
+  <div class="report-header">
+    <div>
+      <div class="report-title" id="hd-title">谈话笔录分析报告</div>
+      <div class="meta-grid" id="hd-meta"></div>
+    </div>
+    <div class="round-badge" id="hd-round"></div>
+  </div>
+
+  <!-- ② 图例 -->
+  <div class="legend" style="border-radius:10px 10px 0 0; border:0.5px solid #ddd; border-bottom:none;">
+    <div class="legend-item"><div class="legend-dot dot-vague"></div>清晰度问题</div>
+    <div class="legend-item"><div class="legend-dot dot-gap"></div>连贯性断裂</div>
+    <div class="legend-item"><div class="legend-dot dot-resist"></div>对抗行为</div>
+    <span class="legend-hint">点击标注文字 → 右栏定位；点击右栏卡片 → 左栏高亮</span>
+  </div>
+
+  <!-- ③ 双栏对照 -->
+  <div class="main-grid" style="border-radius:0 0 12px 12px; overflow:hidden;">
+    <div class="panel" style="border-radius:0; border-right:none;">
+      <div class="panel-header">📄 笔录原文</div>
+      <div class="panel-body" id="transcript-col"></div>
+    </div>
+    <div class="panel" style="border-radius:0;">
+      <div class="panel-header">🏷 逐条标注</div>
+      <div class="anno-col" id="anno-col"></div>
+    </div>
+  </div>
+
+  <!-- ④ 汇总面板 -->
+  <div class="summary-panel" style="margin-top:12px;">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview',this)">概览</button>
+      <button class="tab-btn" onclick="switchTab('hypo',this)">假设影响</button>
+      <button class="tab-btn" onclick="switchTab('multiround',this)">多轮比对</button>
+      <button class="tab-btn" onclick="switchTab('actions',this)">后续行动</button>
+    </div>
+    <div class="tab-content active" id="tab-overview"></div>
+    <div class="tab-content" id="tab-hypo"></div>
+    <div class="tab-content" id="tab-multiround"></div>
+    <div class="tab-content" id="tab-actions"></div>
+  </div>
+
+</div>
+
+<!-- ================================================================
+     ▼▼▼  AGENT 填入区：替换下方四个数据对象，不得修改其他代码  ▼▼▼
+     ================================================================ -->
+<script>
+
+/* ── 1. 基本信息 ── */
+const META = {
+  subject:  "受访者姓名 / 职务",
+  identity: "内部人员 | 关联方 | 外部第三方",
+  date:     "谈话日期",
+  topics:   "本轮核心议题",
+  round:    1
+};
+
+/* ── 2. 笔录问答块（穷举全文每个 Q/A，marks 穷举每块所有问题） ── */
+const BLOCKS = [
+  {
+    id: 1,
+    q: "问题原文",
+    a: "回答原文（纯文本）",
+    marks: [
+      {
+        id:    "a1-v1",
+        type:  "vague",     // vague | gap | resist
+        quote: "被标注的原文片段",
+        note:  "问题说明",
+        env:   "出现环节说明 · 访谈人是否有效追问"
+      }
+    ]
+  },
+  {
+    id: 2,
+    q: "问题原文",
+    a: "回答原文",
+    marks: []
+  }
+  /* 每个问答块一个对象，按实际数量增减 */
+];
+
+/* ── 3. 汇总分析 ── */
+const SUMMARY = {
+  clarity: {
+    rating: "中",
+    count:  3,
+    note:   "评级综合说明"
+  },
+  coherence: {
+    rating: "中",
+    count:  2,
+    note:   "事件链还原：起因（...）；过程（...）；决策（...）；执行（...）；结果（...）"
+  },
+  resist: {
+    count: 1,
+    note:  "对抗行为类型及汇总说明"
+  },
+  hypotheses: [
+    {
+      text:   "假设内容",
+      impact: "strengthen",   // strengthen | neutral | weaken
+      has:    "本轮已提供的可验证支撑",
+      lacks:  "距高证明力仍缺少的材料或信息"
+    }
+  ],
+  multiRound: {
+    consistency:     "首轮无基准",   // 一致 | 存在差异 | 存在矛盾 | 首轮无基准
+    consistencyNote: "",
+    prevListCoverage:"首轮无基准",
+    resistChange:    "首轮无基准"    // 持续 | 升级 | 减弱 | 消失 | 新增 | 首轮无基准
+  }
+};
+
+/* ── 4. 后续行动建议 ── */
+const ACTIONS = [
+  { type: "A", text: "A类追问：可直接使用的问题措辞，注明对应缺口或对抗行为" },
+  { type: "B", text: "B类取证：目标材料名称或具体信息来源" }
+];
+
+</script>
+
+<!-- ================================================================
+     ▲▲▲  AGENT 填入区结束，以下为渲染逻辑，不得修改  ▲▲▲
+     ================================================================ -->
+<script>
+const IMPACT_LABEL = { strengthen:"增强", neutral:"暂无影响", weaken:"削弱" };
+const IMPACT_CLASS = { strengthen:"strengthen", neutral:"neutral", weaken:"weaken" };
+const TYPE_LABEL   = { vague:"清晰度问题", gap:"连贯性断裂", resist:"对抗行为" };
+const TYPE_CLASS   = { vague:"vague", gap:"gap", resist:"resist" };
+
+/* ── header ── */
+document.getElementById("hd-title").textContent = `谈话笔录分析报告 — ${META.subject}`;
+document.getElementById("hd-round").textContent  = `第 ${META.round} 轮`;
+document.getElementById("hd-meta").innerHTML = [
+  `<div class="meta-item">受访者&nbsp;<span>${META.subject}</span></div>`,
+  `<div class="meta-item">身份&nbsp;<span>${META.identity}</span></div>`,
+  `<div class="meta-item">时间&nbsp;<span>${META.date}</span></div>`,
+  `<div class="meta-item">议题&nbsp;<span>${META.topics}</span></div>`
+].join("");
+
+/* ── build anno index ── */
+const annoMap = {};   // id → mark
+const blockAnnoMap = {};  // blockId → [marks]
+BLOCKS.forEach(b => {
+  blockAnnoMap[b.id] = b.marks || [];
+  (b.marks || []).forEach(m => { annoMap[m.id] = { ...m, blockId: b.id }; });
+});
+
+/* ── transcript ── */
+const tcol = document.getElementById("transcript-col");
+BLOCKS.forEach(b => {
+  let aHtml = b.a;
+  // inject marks as spans in answer text (replace exact quote strings)
+  (b.marks || []).forEach(m => {
+    const escaped = m.quote.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    aHtml = aHtml.replace(new RegExp(escaped),
+      `<span class="mark mark-${m.type}" onclick="focusAnno('${m.id}',event)">${m.quote}</span>`);
+  });
+  tcol.insertAdjacentHTML("beforeend", `
+    <div class="qa-block" id="block-${b.id}" onclick="highlightBlock(${b.id})">
+      <div class="qa-label">Q${b.id}</div>
+      <div class="qa-q">${b.q}</div>
+      <div class="qa-label">A${b.id}</div>
+      <div class="qa-a">${aHtml}</div>
+    </div>`);
+});
+
+/* ── annotations ── */
+const acol = document.getElementById("anno-col");
+const groups = { vague:[], gap:[], resist:[] };
+Object.values(annoMap).forEach(m => { if(groups[m.type]) groups[m.type].push(m); });
+const groupLabels = { vague:"清晰度问题", gap:"连贯性断裂", resist:"对抗行为" };
+["vague","gap","resist"].forEach(type => {
+  if(!groups[type].length) return;
+  acol.insertAdjacentHTML("beforeend",
+    `<div class="section-label">${groupLabels[type]}</div>`);
+  groups[type].forEach(m => {
+    acol.insertAdjacentHTML("beforeend", `
+      <div class="anno-card ${TYPE_CLASS[m.type]}" id="anno-${m.id}" onclick="highlightBlock(${m.blockId}); setActiveAnno('${m.id}')">
+        <div class="anno-type ${TYPE_CLASS[m.type]}">${TYPE_LABEL[m.type]}</div>
+        <div class="anno-quote">"${m.quote}"</div>
+        <div class="anno-note">${m.note}</div>
+        <div class="anno-env">${m.env}</div>
+      </div>`);
+  });
+});
+if(!acol.children.length) acol.innerHTML = `<div style="font-size:12px;color:#aaa;padding:8px 0">本轮未发现标注问题</div>`;
+
+/* ── overview tab ── */
+document.getElementById("tab-overview").innerHTML = `
+  <div class="metric-grid">
+    <div class="metric-card">
+      <div class="metric-label">清晰度</div>
+      <div class="metric-value">${SUMMARY.clarity.rating}</div>
+      <div class="metric-sub">${SUMMARY.clarity.count} 处模糊表述</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">连贯性</div>
+      <div class="metric-value">${SUMMARY.coherence.rating}</div>
+      <div class="metric-sub">${SUMMARY.coherence.count} 处结构断裂</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">对抗行为</div>
+      <div class="metric-value">${SUMMARY.resist.count} 项</div>
+      <div class="metric-sub">${SUMMARY.resist.note}</div>
+    </div>
+  </div>
+  <div class="chain-note">${SUMMARY.coherence.note}</div>`;
+
+/* ── hypo tab ── */
+const hypoRows = SUMMARY.hypotheses.map(h => `
+  <tr>
+    <td><div class="hypo-name">${h.text}</div></td>
+    <td><span class="badge ${IMPACT_CLASS[h.impact]}">${IMPACT_LABEL[h.impact]}</span></td>
+    <td>
+      <div class="hypo-has">✓ ${h.has}</div>
+      <div class="hypo-lacks" style="margin-top:4px">✗ ${h.lacks}</div>
+    </td>
+  </tr>`).join("");
+document.getElementById("tab-hypo").innerHTML = `
+  <table class="hypo-table">
+    <thead><tr>
+      <th style="width:28%">假设</th>
+      <th style="width:10%">影响</th>
+      <th>已有支撑 / 仍缺什么</th>
+    </tr></thead>
+    <tbody>${hypoRows}</tbody>
+  </table>`;
+
+/* ── multiround tab ── */
+const mr = SUMMARY.multiRound;
+document.getElementById("tab-multiround").innerHTML = `
+  <div class="mr-grid">
+    <div class="mr-card">
+      <div class="mr-card-label">陈述一致性</div>
+      <div class="mr-card-value"><strong>${mr.consistency}</strong>${mr.consistencyNote ? "<br>" + mr.consistencyNote : ""}</div>
+    </div>
+    <div class="mr-card">
+      <div class="mr-card-label">上轮追问清单覆盖</div>
+      <div class="mr-card-value">${mr.prevListCoverage}</div>
+    </div>
+    <div class="mr-card" style="grid-column:1/-1">
+      <div class="mr-card-label">对抗行为变化</div>
+      <div class="mr-card-value">${mr.resistChange}</div>
+    </div>
+  </div>`;
+
+/* ── actions tab ── */
+const actionItems = ACTIONS.map(a => `
+  <div class="action-item">
+    <span class="action-tag ${a.type.toLowerCase()}">${a.type} 类</span>
+    <div class="action-text">${a.text}</div>
+  </div>`).join("");
+document.getElementById("tab-actions").innerHTML =
+  `<div class="action-list">${actionItems}</div>`;
+
+/* ── interaction ── */
+function highlightBlock(n) {
+  document.querySelectorAll(".qa-block").forEach(b => b.classList.remove("highlighted"));
+  const el = document.getElementById("block-"+n);
+  if(el){ el.classList.add("highlighted"); el.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+}
+function setActiveAnno(id) {
+  document.querySelectorAll(".anno-card").forEach(c => c.classList.remove("active"));
+  const el = document.getElementById("anno-"+id);
+  if(el){ el.classList.add("active"); el.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+}
+function focusAnno(id, e) {
+  if(e) e.stopPropagation();
+  setActiveAnno(id);
+  const m = annoMap[id];
+  if(m) highlightBlock(m.blockId);
+}
+function switchTab(name, btn) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+  btn.classList.add("active");
+}
+</script>
+</body>
+</html>

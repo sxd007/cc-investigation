@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "components": [
+    {
+      "id": "baseline:rules",
+      "family": "baseline",
+      "description": "调查准则与规范基线",
+      "modules": [
+        "rules-core"
+      ]
+    },
+    {
+      "id": "baseline:agents",
+      "family": "baseline",
+      "description": "核心子代理基线",
+      "modules": [
+        "agents-core"
+      ]
+    },
+    {
+      "id": "baseline:commands",
+      "family": "baseline",
+      "description": "核心命令基线",
+      "modules": [
+        "commands-core"
+      ]
+    },
+    {
+      "id": "baseline:platform",
+      "family": "baseline",
+      "description": "平台配置基线",
+      "modules": [
+        "platform-configs"
+      ]
+    },
+    {
+      "id": "capability:foundation",
+      "family": "capability",
+      "description": "调查哲学与方法论 — 所有调查技能的基础",
+      "modules": [
+        "investigation-foundation"
+      ]
+    },
+    {
+      "id": "capability:fraud-classification",
+      "family": "capability",
+      "description": "舞弊分类与路由 — 基于 ACFE 分类框架匹配线索信号、路由到对应 fraud-<domain> 场景技能",
+      "modules": [
+        "fraud-classification"
+      ]
+    },
+    {
+      "id": "capability:investigation-techniques",
+      "family": "capability",
+      "description": "调查技术与工具 — 访谈、取证、外勤、数据分析",
+      "modules": [
+        "investigation-techniques"
+      ]
+    },
+    {
+      "id": "capability:evidence",
+      "family": "capability",
+      "description": "证据链与底稿管理",
+      "modules": [
+        "evidence-management"
+      ]
+    },
+    {
+      "id": "capability:interview",
+      "family": "capability",
+      "description": "访谈分析与陈述审查",
+      "modules": [
+        "interview-analysis"
+      ]
+    },
+    {
+      "id": "capability:data-analysis",
+      "family": "capability",
+      "description": "数据分析与审计技术",
+      "modules": [
+        "data-analysis"
+      ]
+    },
+    {
+      "id": "capability:writing",
+      "family": "capability",
+      "description": "调查写作与报告",
+      "modules": [
+        "writing-reporting"
+      ]
+    },
+    {
+      "id": "capability:case-mgmt",
+      "family": "capability",
+      "description": "案件管理与流程控制",
+      "modules": [
+        "case-management"
+      ]
+    },
+    {
+      "id": "capability:mcp",
+      "family": "capability",
+      "description": "调查 MCP 工具集成 — 技能与 MCP 的连接桥接层",
+      "modules": [
+        "mcp-integration"
+      ]
+    },
+    {
+      "id": "setup:interview",
+      "family": "setup",
+      "description": "Cold-start 首次设置向导 — 团队配置、证据策略、集成检查",
+      "modules": [
+        "cold-start-interview"
+      ]
+    }
+  ]
+}

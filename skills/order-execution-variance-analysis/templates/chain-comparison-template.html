@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>项目执行差异对比图</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f4f0;margin:0;padding:16px}
+.page{max-width:1600px;margin:0 auto;background:#fff;border-radius:12px;border:0.5px solid #ddd;padding:20px 20px 16px}
+.chart-title{font-size:14px;font-weight:500;color:#1a1a1a;margin-bottom:16px}
+.svg-wrap{overflow-x:auto;overflow-y:hidden}
+.svg-inner{display:inline-block;min-width:100%}
+svg text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.risk-section{margin-top:14px;border-top:0.5px solid #eee;padding-top:12px}
+.risk-title{font-size:11px;font-weight:500;color:#888;letter-spacing:.05em;margin-bottom:8px}
+.risk-item{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#444;padding:4px 0;border-bottom:0.5px solid #f0f0f0}
+.risk-item:last-child{border-bottom:none}
+.rdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.rdot-h{background:#E24B4A}.rdot-m{background:#EF9F27}.rdot-l{background:#888}
+.risk-label{font-weight:500;color:#1a1a1a}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="chart-title" id="chart-title"></div>
+  <div class="svg-wrap" id="svg-wrap"><div class="svg-inner" id="svg-inner"></div></div>
+  <div class="risk-section" id="risk-section" style="display:none">
+    <div class="risk-title">风险点汇总</div>
+    <div id="risk-list"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+  ▼▼▼  AGENT 填入区：只修改下方数据，不得改动其他代码  ▼▼▼
+================================================================ -->
+<script>
+
+const CONFIG = {
+  title: "销售链路对比图 — [项目名称]",
+  /* ── 列定义（可选） ──
+     columns 不填时，从下方 NODES 的所有 col 值自动推导。
+     如需自定义标签或排序，显式声明即可覆盖自动推导。
+  */
+  // columns: [
+  //   { id: "tier1",    label: "一代/总代" },
+  //   { id: "tier2",    label: "二代"     },
+  //   { id: "tier3",    label: "三代"     },
+  //   { id: "terminal", label: "终端用户" }
+  // ],
+  /* ── 列宽覆盖（可选） ── */
+  // colWidth: 130,
+  /* ── 标签前缀/后缀覆盖（可选）─
+     默认自动标签为 "一代"/"二代"...；设 prefix="第", suffix="层" → "第一层"/"第二层"
+  */
+  // columnLabelPrefix: "",
+  // columnLabelSuffix: "",
+  rows: [
+    { id: "declared", label: "申报\n链路" },
+    { id: "actual",   label: "实际\n链路" }
+  ]
+};
+
+/*
+  节点字段说明：
+  row    必填  行 id
+  col    必填  列 id
+  name   必填  主名称（公司/主体名）
+  sub    必填  角色说明，≤8字（如"行业金牌"、"商业银牌"、"非认证"； "一代"、"总代"根据交易模式选择一个即可，不清楚就问调查员）
+  meta   可选  节点附加属性，显示在 节点框 下方，小字灰色
+               用于数量、金额、比例等不属于名称或角色的数据
+               示例：{ items: ["700件", "合同编号 xxx"] }
+  style  必填  见样式手册
+  badge  可选  节点上方小标签 { text, bg, color }
+  sub_node 可选 附属节点 { name, sub, style, link_label }
+  group  可选  终端堆叠组，替代 name/sub/meta
+               每项：{ name, sub, meta }
+               meta 同上，显示在该组员节点框的 下方
+*/
+const NODES = [
+  /* 申报链路 */
+  { row:"declared", col:"tier1",
+    name:"重庆佳都", sub:"总代", style:"gray" },
+  { row:"declared", col:"tier2",
+    name:"广州鹏龙", sub:"行业金牌", style:"blue" },
+  /* tier3 申报链路无节点，留空即可 */
+  { row:"declared", col:"terminal",
+    style:"gray",
+    group:[
+      { name:"某有限公司", sub:"申报终端", meta:{ items:["xxx"] } },
+      { name:"某科技公司", sub:"申报终端", meta:{ items:"" } },
+      { name:"某租赁公司", sub:"申报终端", meta:{ items:"" } }
+    ]
+  },
+
+  /* 实际链路 */
+  { row:"actual", col:"tier1",
+    name:"重庆佳都", sub:"总代", style:"gray" },
+  { row:"actual", col:"tier2",
+    name:"广州科技", sub:"行业金牌", style:"blue" },
+  { row:"actual", col:"tier3",
+    name:"广州惠科", sub:"实际收货方", style:"warn",
+    badge:{ text:"非认证代理", bg:"#EF9F27", color:"#633806" },
+    sub_node:{
+      name:"广州金牌", sub:"行业金牌（隐）",
+      style:"ghost", link_label:"关联公司"
+    }
+  },
+  { row:"actual", col:"terminal",
+    name:"字节 / 阿里", sub:"实际使用方", style:"red" }
+];
+
+/*
+  边字段说明：
+  from           必填  { row, col }
+  to             必填  { row, col }
+  style          可选  normal | warn | hidden（不填 dimension 时使用此字段）
+  dimension      可选  语义维度：contract（合同流）| fund_flow（资金流）
+                       | goods_flow（货物流）| control（控制关系）
+  certainty      可选  确定性：confirmed（已确认）| suspected（可疑）| unknown（待核实）
+  pathStyle      可选  路径类型："straight"（默认，同行水平直线）| "elbow"（折线，可跨行）
+  anchorFrom     可选  起点锚点方位："right"|"left"|"top"|"bottom"，默认 "right"
+  anchorTo       可选  终点锚点方位："left"|"right"|"top"|"bottom"
+                       默认：straight→"left", elbow→根据行列自动判断
+  labels         必填  连线下方项目符号文字数组，建议≤4条、每条≤14字
+                       内容 = 左节点卖给右节点的合同关键指标
+                       建议固定顺序：合同成交价 → 渠道利润率 → 其他备注, 如果产品单一则需要强调单价 /数量
+  sameAsDeclared 可选  true 表示与申报链路同路径交易信息完全一致，显示"同上（与申报一致）"
+  riskHighlight  可选  风险高亮标签数组，用于标注利润瞒报等风险点，显示在边上方
+                       示例：["瞒报利润：3,700元/件", "转售利润未披露"]
+*/
+const EDGES = [
+  { from:{row:"declared",col:"tier1"}, to:{row:"declared",col:"tier2"},
+    style:"normal", labels:["6,300元/件","1,000件","利润 2.9%"] },
+  { from:{row:"declared",col:"tier2"}, to:{row:"declared",col:"terminal"},
+    style:"normal", labels:["报备 1,380元/件","1,000件","利润 2.9%"] },
+  { from:{row:"actual",col:"tier1"}, to:{row:"actual",col:"tier2"},
+    style:"warn", labels:["10,000元/件","1,000件","利润 4.3%"],
+    riskHighlight:["瞒报利润：3,700元/件"] },
+  { from:{row:"actual",col:"tier2"}, to:{row:"actual",col:"tier3"},
+    style:"warn", labels:["实际成交","隐藏过单","关联公司"] },
+  { from:{row:"actual",col:"tier3"}, to:{row:"actual",col:"terminal"},
+    style:"warn", labels:["转售","单价待核实"],
+    riskHighlight:["转售利润未披露"] }
+];
+
+const RISKS = [
+  { level:"high",   label:"渠道利润差异", desc:"申报 2.9% → 实际 4.3%，差值 1.4% 未披露" },
+  { level:"high",   label:"收货方不符",   desc:"实际收货方广州惠科为非认证代理，与申报终端广东科技不一致" },
+  { level:"high",   label:"隐藏链路",     desc:"广州金牌与广州惠科存在关联关系，渠道中间层被刻意隐瞒" },
+  { level:"medium", label:"终端客户虚报", desc:"实际使用方为字节/阿里，与合同申报终端不符" }
+];
+
+</script>
+<!-- ================================================================
+  ▲▲▲  AGENT 填入区结束  ▲▲▲
+================================================================ -->
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   渲染引擎 — 仅供维护，调查员和 AI 代理不得修改以下代码
+   ══════════════════════════════════════════════════════════════════ */
+
+const NS = "http://www.w3.org/2000/svg";
+function el(tag,attrs,text){
+  const e=document.createElementNS(NS,tag);
+  Object.entries(attrs||{}).forEach(([k,v])=>e.setAttribute(k,v));
+  if(text!==undefined)e.textContent=text;
+  return e;
+}
+
+/* ── 列自动推导 ── */
+
+const CHINESE_NUMS = ['零','一','二','三','四','五','六','七','八','九','十',
+  '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+
+function autoLabel(colId, index, total) {
+  if (colId === 'terminal') return '终端用户';
+  const num = parseInt(colId.replace(/^tier/i, ''), 10);
+  if (!isNaN(num) && num > 0) {
+    const prefix = CONFIG.columnLabelPrefix || '';
+    const suffix = CONFIG.columnLabelSuffix || '代';
+    const numStr = num < CHINESE_NUMS.length ? CHINESE_NUMS[num] : num + '';
+    return prefix + numStr + suffix;
+  }
+  return colId;
+}
+
+function autoDeriveColumns(nodes) {
+  const colSet = new Set();
+  nodes.forEach(n => { if (n.col) colSet.add(n.col); });
+  const sorted = Array.from(colSet).sort((a, b) => {
+    const aIsTerm = a === 'terminal', bIsTerm = b === 'terminal';
+    if (aIsTerm && !bIsTerm) return 1;
+    if (!aIsTerm && bIsTerm) return -1;
+    const aNum = parseInt(a.replace(/^tier/i, ''), 10);
+    const bNum = parseInt(b.replace(/^tier/i, ''), 10);
+    if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+    return a.localeCompare(b);
+  });
+  return sorted.map((id, i) => ({ id, label: autoLabel(id, i, sorted.length) }));
+}
+
+/* ── 语义样式映射 ── */
+
+const SEMANTIC_STYLES = {
+  contract: {
+    confirmed: { stroke: "#378ADD", arr: "arr-c-cf",  tc: "#185FA5", dash: null,      label: "合同流 / 已确认" },
+    suspected: { stroke: "#378ADD", arr: "arr-c-sp",  tc: "#185FA5", dash: "6 4",     label: "合同流 / 可疑"   },
+    unknown:   { stroke: "#8CB8E8", arr: "arr-c-un",  tc: "#6080A0", dash: "3 3",     label: "合同流 / 待核实" }
+  },
+  fund_flow: {
+    confirmed: { stroke: "#1B8A3D", arr: "arr-f-cf",  tc: "#0F5C28", dash: null,      label: "资金流 / 已确认" },
+    suspected: { stroke: "#1B8A3D", arr: "arr-f-sp",  tc: "#0F5C28", dash: "6 4",     label: "资金流 / 可疑"   },
+    unknown:   { stroke: "#7FC08A", arr: "arr-f-un",  tc: "#4A8055", dash: "3 3",     label: "资金流 / 待核实" }
+  },
+  goods_flow: {
+    confirmed: { stroke: "#8B5CF6", arr: "arr-g-cf",  tc: "#5B21B6", dash: null,      label: "货物流 / 已确认" },
+    suspected: { stroke: "#8B5CF6", arr: "arr-g-sp",  tc: "#5B21B6", dash: "6 4",     label: "货物流 / 可疑"   },
+    unknown:   { stroke: "#B89EF0", arr: "arr-g-un",  tc: "#7C5FBF", dash: "3 3",     label: "货物流 / 待核实" }
+  },
+  control: {
+    confirmed: { stroke: "#D4537E", arr: "arr-o-cf",  tc: "#993556", dash: null,      label: "控制关系 / 已确认" },
+    suspected: { stroke: "#D4537E", arr: "arr-o-sp",  tc: "#993556", dash: "6 4",     label: "控制关系 / 可疑"   },
+    unknown:   { stroke: "#E08FAA", arr: "arr-o-un",  tc: "#AA6080", dash: "3 3",     label: "控制关系 / 待核实" }
+  }
+};
+
+const ESTYLES = {
+  normal:{stroke:"#B4B2A9",arr:"arr-n",tc:"#888",label:"申报链路"},
+  warn:  {stroke:"#D85A30",arr:"arr-w",tc:"#993C1D",label:"实际链路（异常）"},
+  hidden:{stroke:"#D4537E",arr:"arr-h",tc:"#993556",dash:"5 4",label:"隐藏链路"}
+};
+
+function resolveEdgeStyle(edge) {
+  if (edge.dimension && SEMANTIC_STYLES[edge.dimension]) {
+    const cert = edge.certainty || "confirmed";
+    return SEMANTIC_STYLES[edge.dimension][cert] || SEMANTIC_STYLES[edge.dimension].confirmed;
+  }
+  return ESTYLES[edge.style] || ESTYLES.normal;
+}
+
+/* ── 布局常量 ── */
+const COL_W = CONFIG.colWidth || 130;
+const COL_GAP = 120;
+const NODE_R = 6, LABEL_X = 64;
+const BADGE_H = 18, BADGE_W = 100;
+const SUB_H = 40, SUB_GAP = 34;
+const COL_SKIP = COL_W + COL_GAP;
+const EDGE_LABEL_OFFSET_X = 5;
+const EDGE_LABEL_OFFSET_Y = 8;
+
+/* auto label offset for fork-to-group edges */
+function getLabelPos(edge, x1, x2, startY, toNode){
+  let lx=x1+EDGE_LABEL_OFFSET_X, ly=startY-EDGE_LABEL_OFFSET_Y;
+  if(toNode&&toNode.group&&toNode._fork_ys){
+    const groupTop=toNode._fork_ys[0];
+    const groupBottom=toNode._fork_ys[toNode._fork_ys.length-1];
+    lx=x1+4;
+    ly=startY-Math.max(36,(groupTop-startY)*0.5);
+  }
+  return {x:lx, y:ly};
+}
+
+function renderLabel(svg, text, x, y, fill, fontSize){
+  svg.appendChild(el("text",{x,y,"dominant-baseline":"central","font-family":"inherit","font-size":fontSize||"11",fill:fill||"#888"},text));
+}
+
+function renderLabelStack(svg, labels, baseX, baseY, fill, fontSize){
+  labels.forEach((lb,i)=>{
+    const ly=i===0?baseY:i*14+baseY;
+    renderLabel(svg, lb, baseX, ly, fill, fontSize);
+  });
+}
+
+/* ── 列初始化：columns 可选，不填则自动推导 ── */
+const COLS = (CONFIG.columns && CONFIG.columns.length > 0)
+  ? CONFIG.columns
+  : autoDeriveColumns(NODES);
+const ROWS = CONFIG.rows;
+const colIdx = {}; COLS.forEach((c,i)=>colIdx[c.id]=i);
+const rowIdx = {}; ROWS.forEach((r,i)=>rowIdx[r.id]=i);
+const nodeMap = {}; NODES.forEach(n=>nodeMap[n.row+":"+n.col]=n);
+
+/* ── 节点覆写/占位检测表 ── */
+const nodeGrid = new Set();
+NODES.forEach(n => nodeGrid.add(n.row + ":" + n.col));
+
+/* node height */
+function nodeH(n){
+  if(!n) return 44;
+  if(n.group) return groupH(n);
+  let h=44;
+  if(n.meta&&n.meta.items) h+=n.meta.items.length*14;
+  return h;
+}
+function groupMemberH(gm){
+  let h=44;
+  if(gm.meta&&gm.meta.items) h+=gm.meta.items.length*14;
+  return h;
+}
+function groupH(n){
+  if(!n.group) return 44;
+  return n.group.reduce((s,gm,i)=>s+groupMemberH(gm)+(i>0?6:0),0);
+}
+
+function rowCY(ri){
+  let maxH=44;
+  NODES.forEach(n=>{ if(rowIdx[n.row]===ri) maxH=Math.max(maxH,nodeH(n)); });
+  let y=50;
+  for(let i=0;i<ri;i++){
+    let rh=44;
+    NODES.forEach(n=>{ if(rowIdx[n.row]===i) rh=Math.max(rh,nodeH(n)); });
+    let sub=0;
+    NODES.forEach(n=>{ if(rowIdx[n.row]===i&&n.sub_node) sub=Math.max(sub,SUB_GAP+SUB_H+16); });
+    y+=rh+sub+80;
+  }
+  return y+maxH/2;
+}
+
+/* svg size */
+const SVG_W = LABEL_X+COLS.length*COL_SKIP-COL_GAP+40;
+let SVG_H=0;
+ROWS.forEach((_,ri)=>{
+  let rh=44;
+  NODES.forEach(n=>{if(rowIdx[n.row]===ri)rh=Math.max(rh,nodeH(n));});
+  let sub=0;
+  NODES.forEach(n=>{if(rowIdx[n.row]===ri&&n.sub_node)sub=Math.max(sub,SUB_GAP+SUB_H+16);});
+  SVG_H+=rh+sub+80;
+});
+SVG_H+=60;
+
+const STYLES={
+  gray: {fill:"#fafaf8",stroke:"#c8c6bc",sw:"0.5",tname:"#1a1a1a",tsub:"#888",tmeta:"#aaa"},
+  blue: {fill:"#E6F1FB",stroke:"#378ADD",sw:"0.5",tname:"#0C447C",tsub:"#185FA5",tmeta:"#378ADD"},
+  warn: {fill:"#FAEEDA",stroke:"#EF9F27",sw:"1.5",dash:"4 3",tname:"#633806",tsub:"#854F0B",tmeta:"#854F0B"},
+  red:  {fill:"#FCEBEB",stroke:"#E24B4A",sw:"0.5",tname:"#501313",tsub:"#A32D2D",tmeta:"#A32D2D"},
+  ghost:{fill:"#fafaf8",stroke:"#D4537E",sw:"0.5",dash:"4 3",tname:"#993556",tsub:"#993556",tmeta:"#993556"}
+};
+
+/* ── 渲染开始 ── */
+document.getElementById("chart-title").textContent=CONFIG.title;
+
+const svg=el("svg",{width:"100%",viewBox:`0 0 ${SVG_W} ${SVG_H}`,xmlns:NS,style:"display:block"});
+
+/* defs: markers */
+const defs=el("defs");
+/* semantic markers */
+Object.entries(SEMANTIC_STYLES).forEach(([dim, certMap]) => {
+  Object.entries(certMap).forEach(([cert, s]) => {
+    const m=el("marker",{id:s.arr,viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"6",markerHeight:"6",orient:"auto-start-reverse"});
+    m.appendChild(el("path",{d:"M2 1L8 5L2 9",fill:"none",stroke:s.stroke,"stroke-width":"1.5","stroke-linecap":"round","stroke-linejoin":"round"}));
+    defs.appendChild(m);
+  });
+});
+/* legacy markers */
+[["arr-n","#B4B2A9"],["arr-w","#D85A30"],["arr-h","#D4537E"]].forEach(([id,c])=>{
+  const m=el("marker",{id,viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"6",markerHeight:"6",orient:"auto-start-reverse"});
+  m.appendChild(el("path",{d:"M2 1L8 5L2 9",fill:"none",stroke:c,"stroke-width":"1.5","stroke-linecap":"round","stroke-linejoin":"round"}));
+  defs.appendChild(m);
+});
+svg.appendChild(defs);
+
+/* col guide lines + headers */
+COLS.forEach((c,ci)=>{
+  const cx=LABEL_X+ci*COL_SKIP+COL_W/2;
+  svg.appendChild(el("line",{x1:cx,y1:35,x2:cx,y2:SVG_H-55,stroke:"#e8e6e0","stroke-width":"0.5","stroke-dasharray":"2 5"}));
+  svg.appendChild(el("text",{x:cx,y:20,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"11","font-weight":"500",fill:"#aaa","letter-spacing":"0.04em"},c.label));
+});
+
+/* draw node helper */
+function drawNode(svg, n, lx, top, st, cx){
+  const nh=nodeH(n);
+  const ra={x:lx,y:top,width:COL_W,height:nh,rx:NODE_R,fill:st.fill,stroke:st.stroke,"stroke-width":st.sw};
+  if(st.dash) ra["stroke-dasharray"]=st.dash;
+  svg.appendChild(el("rect",ra));
+  svg.appendChild(el("text",{x:cx,y:top+14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"12","font-weight":"500",fill:st.tname},n.name));
+  svg.appendChild(el("text",{x:cx,y:top+28,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:st.tsub},n.sub));
+  if(n.meta&&n.meta.items){
+    n.meta.items.forEach((item,ii)=>{
+      svg.appendChild(el("text",{x:cx,y:top+42+ii*14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10",fill:st.tmeta},item));
+    });
+  }
+}
+
+/* draw placeholder for missing cells */
+function drawPlaceholder(svg, cx, cy, lx, isDeclaredMissing){
+  const ph=44, pTop=cy-ph/2;
+  svg.appendChild(el("rect",{
+    x:lx, y:pTop, width:COL_W, height:ph, rx:NODE_R,
+    fill:"#fafaf8", stroke:"#ddd", "stroke-width":"0.5", "stroke-dasharray":"3 3"
+  }));
+  svg.appendChild(el("text",{
+    x:cx, y:cy, "text-anchor":"middle","dominant-baseline":"central",
+    "font-family":"inherit","font-size":"11", fill:"#ccc"
+  },"—"));
+  /* badge */
+  const badgeText = isDeclaredMissing ? "未申报" : "未涉及";
+  const badgeBg = isDeclaredMissing ? "#FCEBEB" : "#f0f0f0";
+  const badgeColor = isDeclaredMissing ? "#C0392B" : "#888";
+  const bx = cx - 30, by = pTop - BADGE_H - 4;
+  svg.appendChild(el("rect",{x:bx, y:by, width:60, height:BADGE_H, rx:BADGE_H/2, fill:badgeBg}));
+  svg.appendChild(el("text",{
+    x:cx, y:by+BADGE_H/2, "text-anchor":"middle","dominant-baseline":"central",
+    "font-family":"inherit","font-size":"10","font-weight":"500", fill:badgeColor
+  }, badgeText));
+}
+
+/* rows */
+ROWS.forEach((row,ri)=>{
+  const cy=rowCY(ri);
+  /* row label */
+  row.label.split("\n").forEach((line,li,arr)=>{
+    svg.appendChild(el("text",{x:LABEL_X-8,y:cy+(li-(arr.length-1)/2)*14,"text-anchor":"end","dominant-baseline":"central","font-family":"inherit","font-size":"11","font-weight":"500",fill:"#aaa"},line));
+  });
+
+  COLS.forEach((col,ci)=>{
+    const cx=LABEL_X+ci*COL_SKIP+COL_W/2;
+    const lx=LABEL_X+ci*COL_SKIP;
+    const n=nodeMap[row.id+":"+col.id];
+
+    if(!n){
+      /* ── 异构深度：缺失列自动填充占位 ── */
+      const otherRowHasNode = ROWS.some(r => r.id !== row.id && nodeGrid.has(r.id + ":" + col.id));
+      if (otherRowHasNode) {
+        const isDeclaredRow = row.id === "declared" || row.id.startsWith("declared");
+        drawPlaceholder(svg, cx, cy, lx, isDeclaredRow);
+      } else {
+        /* 两行都缺此列 → 简单占位 */
+        svg.appendChild(el("text",{x:cx,y:cy,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:"#ccc"},"—"));
+      }
+      return;
+    }
+
+    const st=STYLES[n.style]||STYLES.gray;
+    const nh=nodeH(n);
+    const top=cy-nh/2;
+
+    /* badge */
+    if(n.badge){
+      const bx=cx-BADGE_W/2, by=top-BADGE_H-4;
+      svg.appendChild(el("rect",{x:bx,y:by,width:BADGE_W,height:BADGE_H,rx:BADGE_H/2,fill:n.badge.bg}));
+      svg.appendChild(el("text",{x:cx,y:by+BADGE_H/2,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10","font-weight":"500",fill:n.badge.color},n.badge.text));
+    }
+
+    if(n.group){
+      /* stacked group */
+      const gh=6;
+      let gy=top;
+      n.group.forEach((gm,gi)=>{
+        const gmh=groupMemberH(gm);
+        const gmst=STYLES[n.style]||STYLES.gray;
+        const gmcx=cx;
+        const gra={x:lx,y:gy,width:COL_W,height:gmh,rx:NODE_R,fill:gmst.fill,stroke:gmst.stroke,"stroke-width":gmst.sw||"0.5"};
+        svg.appendChild(el("rect",gra));
+        svg.appendChild(el("text",{x:gmcx,y:gy+14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"12","font-weight":"500",fill:gmst.tname},gm.name));
+        svg.appendChild(el("text",{x:gmcx,y:gy+28,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:gmst.tsub},gm.sub));
+        if(gm.meta&&gm.meta.items){
+          gm.meta.items.forEach((item,ii)=>{
+            svg.appendChild(el("text",{x:gmcx,y:gy+42+ii*14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10",fill:gmst.tmeta||"#aaa"},item));
+          });
+        }
+        gm._cy=gy+gmh/2;
+        gy+=gmh+gh;
+      });
+      n._fork_ys=n.group.map(gm=>gm._cy);
+    } else {
+      drawNode(svg,n,lx,top,st,cx);
+    }
+
+    /* sub_node */
+    if(n.sub_node){
+      const sn=n.sub_node;
+      const snst=STYLES[sn.style]||STYLES.ghost;
+      const mainBottom=cy+nh/2;
+      const snTop=mainBottom+SUB_GAP;
+      svg.appendChild(el("line",{x1:cx,y1:mainBottom,x2:cx,y2:snTop,stroke:snst.stroke,"stroke-width":"1","stroke-dasharray":"3 3"}));
+      if(sn.link_label){
+        svg.appendChild(el("text",{x:cx+5,y:mainBottom+SUB_GAP/2,"dominant-baseline":"central","font-family":"inherit","font-size":"10",fill:snst.stroke},sn.link_label));
+      }
+      const snAttrs={x:lx,y:snTop,width:COL_W,height:SUB_H,rx:NODE_R,fill:snst.fill,stroke:snst.stroke,"stroke-width":"0.5"};
+      if(snst.dash) snAttrs["stroke-dasharray"]=snst.dash;
+      svg.appendChild(el("rect",snAttrs));
+      svg.appendChild(el("text",{x:cx,y:snTop+14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"12","font-weight":"500",fill:snst.tname},sn.name));
+      svg.appendChild(el("text",{x:cx,y:snTop+28,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:snst.tsub},sn.sub));
+    }
+  });
+});
+
+/* ── 节点锚点坐标计算（用于 elbow 路径） ── */
+function getNodeAnchor(node, colId, rowId, anchorDir) {
+  const ri = rowIdx[rowId];
+  const ci = colIdx[colId];
+  if (ri === undefined || ci === undefined) return null;
+  const cy = rowCY(ri);
+  const nh = node ? nodeH(node) : 44;
+  const top = cy - nh/2;
+  const cx = LABEL_X + ci * COL_SKIP + COL_W / 2;
+  const lx = LABEL_X + ci * COL_SKIP;
+  switch (anchorDir) {
+    case "right":  return { x: lx + COL_W, y: cy };
+    case "left":   return { x: lx, y: cy };
+    case "top":    return { x: cx, y: top };
+    case "bottom": return { x: cx, y: top + nh };
+    default:       return { x: lx + COL_W, y: cy };
+  }
+}
+
+/* ── 3 段式折线路径 ── */
+function computeElbowPath(fromPt, toPt) {
+  const { x: x1, y: y1 } = fromPt;
+  const { x: x2, y: y2 } = toPt;
+  if (Math.abs(y2 - y1) < 10) {
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+  const midX = x1 + (x2 - x1) * 0.5;
+  return `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
+}
+
+/* ── 自动 Legend ── */
+function buildLegend(edges) {
+  const seen = new Map();
+  edges.forEach(edge => {
+    if (edge.dimension && SEMANTIC_STYLES[edge.dimension]) {
+      const cert = edge.certainty || "confirmed";
+      const key = edge.dimension + ":" + cert;
+      if (!seen.has(key)) seen.set(key, { style: SEMANTIC_STYLES[edge.dimension][cert], type: "semantic" });
+    } else {
+      const key = "legacy:" + (edge.style || "normal");
+      if (!seen.has(key)) seen.set(key, { style: ESTYLES[edge.style] || ESTYLES.normal, type: "legacy" });
+    }
+  });
+  return Array.from(seen.values());
+}
+
+/* ── 边渲染 ── */
+EDGES.forEach(edge=>{
+  const ri=rowIdx[edge.from.row];
+  const ci=colIdx[edge.from.col];
+  const ti=colIdx[edge.to.col];
+  if(ri===undefined||ci===undefined||ti===undefined) return;
+
+  const fromNode = nodeMap[edge.from.row+":"+edge.from.col];
+  const toNode = nodeMap[edge.to.row+":"+edge.to.col];
+  const es = resolveEdgeStyle(edge);
+
+  const pathStyle = edge.pathStyle || "straight";
+
+  const x1=LABEL_X+ci*COL_SKIP+COL_W;
+  const x2=LABEL_X+ti*COL_SKIP;
+  const y1=rowCY(ri);
+
+  if (pathStyle === "elbow") {
+    /* ── 折线路径 ── */
+    const fromDir = edge.anchorFrom || "right";
+    const toDir = edge.anchorTo || (edge.from.row === edge.to.row ? "left" : "bottom");
+    const fromPt = getNodeAnchor(fromNode, edge.from.col, edge.from.row, fromDir);
+    const toPt   = getNodeAnchor(toNode,   edge.to.col,   edge.to.row,   toDir);
+    if (!fromPt || !toPt) return;
+
+    const pathD = computeElbowPath(fromPt, toPt);
+    const pathAttrs = { d: pathD, fill: "none", stroke: es.stroke, "stroke-width": "1.5", "marker-end": `url(#${es.arr})` };
+    if (es.dash) pathAttrs["stroke-dasharray"] = es.dash;
+    svg.appendChild(el("path", pathAttrs));
+
+    /* risk highlight labels */
+    if (edge.riskHighlight && edge.riskHighlight.length) {
+      const midX = (fromPt.x + toPt.x) / 2;
+      const midY = (fromPt.y + toPt.y) / 2;
+      edge.riskHighlight.forEach((rh, rhi) => {
+        svg.appendChild(el("text",{x:midX,y:midY-16-rhi*14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10","font-weight":"500",fill:"#E24B4A"},rh));
+      });
+    }
+
+    /* labels at midpoint */
+    if (edge.sameAsDeclared) {
+      renderLabelStack(svg, ["· 同上（与申报一致）"], fromPt.x+4, fromPt.y+8, "#888");
+    } else if (edge.labels && edge.labels.length) {
+      const labeled = edge.labels.map(lb => "· "+lb);
+      renderLabelStack(svg, labeled, fromPt.x+4, fromPt.y+8, es.tc);
+    }
+
+  } else if (toNode && toNode.group && toNode._fork_ys) {
+    /* ── fork to group: fan-style curved arcs ── */
+    const startY = y1;
+    const ys = toNode._fork_ys;
+    const lp = getLabelPos(edge, x1, x2, startY, toNode);
+
+    ys.forEach((ty, i) => {
+      const cpx = x1 + (x2 - x1) * 0.55;
+      const cpy = startY + (ty - startY) * 0.3;
+      const pathAttrs = { d: `M${x1},${startY} Q${cpx},${cpy} ${x2-2},${ty}`, fill: "none", stroke: es.stroke, "stroke-width": "1.5", "marker-end": `url(#${es.arr})` };
+      if (es.dash) pathAttrs["stroke-dasharray"] = es.dash;
+      svg.appendChild(el("path", pathAttrs));
+    });
+
+    if (edge.riskHighlight && edge.riskHighlight.length) {
+      const midX = x1 + (x2 - x1) * 0.35;
+      edge.riskHighlight.forEach((rh, rhi) => {
+        svg.appendChild(el("text",{x:midX,y:startY-18-rhi*14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10","font-weight":"500",fill:"#E24B4A"},rh));
+      });
+    }
+
+    if (edge.sameAsDeclared) {
+      renderLabelStack(svg, ["· 同上（与申报一致）"], lp.x, lp.y, "#888");
+    } else if (edge.labels && edge.labels.length) {
+      const labeled = edge.labels.map(lb => "· "+lb);
+      renderLabelStack(svg, labeled, lp.x, lp.y, es.tc);
+    }
+  } else {
+    /* ── 直连（默认） ── */
+    const y2 = rowCY(ri);
+    const la = { x1, y1, x2, y2, stroke: es.stroke, "stroke-width": "1.5", "marker-end": `url(#${es.arr})` };
+    if (edge.sameAsDeclared) {
+      la["stroke-dasharray"] = "4 3";
+    } else if (es.dash) {
+      la["stroke-dasharray"] = es.dash;
+    }
+    svg.appendChild(el("line", la));
+
+    if (edge.riskHighlight && edge.riskHighlight.length) {
+      const midX = (x1 + x2) / 2;
+      edge.riskHighlight.forEach((rh, rhi) => {
+        svg.appendChild(el("text",{x:midX,y:y1-16-rhi*14,"text-anchor":"middle","dominant-baseline":"central","font-family":"inherit","font-size":"10","font-weight":"500",fill:"#E24B4A"},rh));
+      });
+    }
+
+    if (edge.sameAsDeclared) {
+      renderLabelStack(svg, ["· 同上（与申报一致）"], x1+EDGE_LABEL_OFFSET_X, y1+EDGE_LABEL_OFFSET_Y, "#888");
+    } else if (edge.labels && edge.labels.length) {
+      const labeled = edge.labels.map(lb => "· "+lb);
+      renderLabelStack(svg, labeled, x1+EDGE_LABEL_OFFSET_X, y1+EDGE_LABEL_OFFSET_Y, es.tc);
+    }
+  }
+});
+
+/* row dividers */
+for(let ri=0;ri<ROWS.length-1;ri++){
+  const cy=rowCY(ri);
+  let rh=44;NODES.forEach(n=>{if(rowIdx[n.row]===ri)rh=Math.max(rh,nodeH(n));});
+  let sub=0;NODES.forEach(n=>{if(rowIdx[n.row]===ri&&n.sub_node)sub=Math.max(sub,SUB_GAP+SUB_H+16);});
+  const dy=cy+rh/2+sub+22;
+  svg.appendChild(el("line",{x1:LABEL_X-10,y1:dy,x2:SVG_W-10,y2:dy,stroke:"#e8e6e0","stroke-width":"0.5","stroke-dasharray":"4 5"}));
+}
+
+/* ── 自动 Legend ── */
+(function renderLegend() {
+  const legY = SVG_H - 20;
+  const LEGEND_ITEM_GAP = 24;
+  const legItems = buildLegend(EDGES);
+  let legX = LABEL_X;
+
+  legItems.forEach(item => {
+    const s = item.style;
+    const la = { x1: legX, y1: legY, x2: legX+22, y2: legY, stroke: s.stroke, "stroke-width": "1.5" };
+    if (s.dash) la["stroke-dasharray"] = s.dash;
+    svg.appendChild(el("line", la));
+    svg.appendChild(el("text",{x:legX+26,y:legY,"dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:"#888"}, s.label));
+    legX += 26 + s.label.length * 7 + LEGEND_ITEM_GAP;
+  });
+
+  /* 异常节点 box legend — 仅在图纸有 warn/red 节点时追加 */
+  const hasWarnNode = NODES.some(n => n.style === "warn" || n.style === "red");
+  if (hasWarnNode) {
+    svg.appendChild(el("rect",{x:legX,y:legY-6,width:12,height:12,rx:2,fill:"#FAEEDA",stroke:"#EF9F27","stroke-width":"1","stroke-dasharray":"3 2"}));
+    svg.appendChild(el("text",{x:legX+16,y:legY,"dominant-baseline":"central","font-family":"inherit","font-size":"11",fill:"#888"},"异常节点"));
+  }
+})();
+
+document.getElementById("svg-inner").appendChild(svg);
+
+/* risks */
+if(RISKS&&RISKS.length){
+  document.getElementById("risk-section").style.display="block";
+  const rl=document.getElementById("risk-list");
+  RISKS.forEach(r=>{
+    const d=document.createElement("div");d.className="risk-item";
+    const dc={high:"rdot-h",medium:"rdot-m",low:"rdot-l"}[r.level]||"rdot-l";
+    d.innerHTML=`<div class="rdot ${dc}"></div><div><span class="risk-label">${r.label}：</span>${r.desc}</div>`;
+    rl.appendChild(d);
+  });
+}
+</script>
+</body>
+</html>

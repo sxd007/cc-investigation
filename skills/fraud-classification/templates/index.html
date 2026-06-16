@@ -1,0 +1,2658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fraud Tree Editor</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3b82f6',
+            secondary: '#64748b',
+            success: '#10b981',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+            dark: '#1e293b',
+            light: '#f8fafc'
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .content-auto {
+        content-visibility: auto;
+      }
+      .tree-node {
+        @apply border-l-2 border-gray-200 pl-4 py-1;
+      }
+      .tree-node-last {
+        @apply border-l-2 border-gray-200 border-t-2 border-r-2 rounded-tr-md pl-4 py-1;
+      }
+      .edit-form {
+        @apply bg-white rounded-lg shadow-md p-4 mb-4;
+      }
+      .form-group {
+        @apply mb-3;
+      }
+      .form-label {
+        @apply block text-sm font-medium text-gray-700 mb-1;
+      }
+      .form-input {
+        @apply w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+      }
+      .form-textarea {
+        @apply w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y;
+      }
+      .btn {
+        @apply px-4 py-2 rounded-md font-medium transition-colors;
+      }
+      .btn-primary {
+        @apply bg-primary text-white hover:bg-primary/90;
+      }
+      .btn-secondary {
+        @apply bg-secondary text-white hover:bg-secondary/90;
+      }
+      .btn-success {
+        @apply bg-success text-white hover:bg-success/90;
+      }
+      .btn-danger {
+        @apply bg-danger text-white hover:bg-danger/90;
+      }
+      .btn-outline {
+        @apply border border-gray-300 text-gray-700 hover:bg-gray-50;
+      }
+      .badge {
+        @apply px-2 py-1 text-xs font-medium rounded-full;
+      }
+      .badge-blue {
+        @apply bg-blue-100 text-blue-800;
+      }
+      .badge-green {
+        @apply bg-green-100 text-green-800;
+      }
+      .badge-yellow {
+        @apply bg-yellow-100 text-yellow-800;
+      }
+      .badge-red {
+        @apply bg-red-100 text-red-800;
+      }
+      .badge-purple {
+        @apply bg-purple-100 text-purple-800;
+      }
+      .badge-gray {
+        @apply bg-gray-100 text-gray-800;
+      }
+    }
+
+    /* 深色主题样式 */
+    .dark {
+      @apply bg-gray-900 text-gray-200;
+    }
+
+    .dark .bg-white {
+      @apply bg-gray-800;
+    }
+
+    .dark .text-gray-900 {
+      @apply text-gray-100;
+    }
+
+    .dark .text-gray-700 {
+      @apply text-gray-300;
+    }
+
+    .dark .text-gray-600 {
+      @apply text-gray-400;
+    }
+
+    .dark .text-gray-500 {
+      @apply text-gray-400;
+    }
+
+    .dark .border-gray-200 {
+      @apply border-gray-700;
+    }
+
+    .dark .border-gray-300 {
+      @apply border-gray-600;
+    }
+
+    .dark .bg-gray-100 {
+      @apply bg-gray-700;
+    }
+
+    .dark .bg-gray-50 {
+      @apply bg-gray-800;
+    }
+
+    .dark .hover:bg-gray-50 {
+      @apply hover:bg-gray-700;
+    }
+
+    .dark .hover:bg-gray-100 {
+      @apply hover:bg-gray-700;
+    }
+
+    .dark .form-label {
+      @apply text-gray-300;
+    }
+
+    .dark .form-input {
+      @apply bg-gray-700 border-gray-600 text-gray-200;
+    }
+
+    .dark .form-textarea {
+      @apply bg-gray-700 border-gray-600 text-gray-200;
+    }
+
+    .dark .btn-outline {
+      @apply border-gray-600 text-gray-300 hover:bg-gray-700;
+    }
+
+    .dark .badge-blue {
+      @apply bg-blue-900 text-blue-200;
+    }
+
+    .dark .badge-green {
+      @apply bg-green-900 text-green-200;
+    }
+
+    .dark .badge-yellow {
+      @apply bg-yellow-900 text-yellow-200;
+    }
+
+    .dark .badge-red {
+      @apply bg-red-900 text-red-200;
+    }
+
+    .dark .badge-purple {
+      @apply bg-purple-900 text-purple-200;
+    }
+
+    .dark .badge-gray {
+      @apply bg-gray-700 text-gray-300;
+    }
+
+    .dark .tree-node {
+      @apply border-gray-700;
+    }
+
+    .dark .tree-node-last {
+      @apply border-gray-700;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+        <i class="fa fa-sitemap mr-3 text-primary"></i>
+        ACFE Fraud Tree Editor
+      </h1>
+      <p class="text-gray-600 mt-2">交互式编辑欺诈分类树，可修改现有元素或添加新属性</p>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex flex-col lg:flex-row gap-6">
+      <!-- Tree View -->
+      <div class="lg:w-3/4 bg-white rounded-lg shadow-md p-6">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold text-gray-900">Fraud Tree 结构</h2>
+          <div class="flex gap-2">
+            <button id="save-btn" class="btn btn-success flex items-center">
+              <i class="fa fa-save mr-2"></i> 保存更改
+            </button>
+            <button id="create-version-btn" class="btn btn-primary flex items-center">
+              <i class="fa fa-tag mr-2"></i> 创建版本
+            </button>
+            <button id="version-history-btn" class="btn btn-outline flex items-center">
+              <i class="fa fa-history mr-2"></i> 版本历史
+            </button>
+            <button id="tags-btn" class="btn btn-outline flex items-center">
+              <i class="fa fa-tags mr-2"></i> 标签管理
+            </button>
+            <div class="relative">
+              <button id="theme-toggle" class="btn btn-outline flex items-center">
+                <i class="fa fa-moon-o mr-2"></i> 主题
+              </button>
+              <div id="theme-dropdown" class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden">
+                <button class="theme-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-theme="light">
+                  <i class="fa fa-sun-o mr-2"></i> 浅色主题
+                </button>
+                <button class="theme-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-theme="dark">
+                  <i class="fa fa-moon-o mr-2"></i> 深色主题
+                </button>
+                <button class="theme-option block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" data-theme="system">
+                  <i class="fa fa-desktop mr-2"></i> 系统主题
+                </button>
+              </div>
+            </div>
+            <button id="expand-all-btn" class="btn btn-outline flex items-center">
+              <i class="fa fa-plus-square mr-2"></i> 全部展开
+            </button>
+            <button id="collapse-all-btn" class="btn btn-outline flex items-center">
+              <i class="fa fa-minus-square mr-2"></i> 全部折叠
+            </button>
+          </div>
+        </div>
+        <div id="tree-container" class="overflow-auto max-h-[800px]">
+          <!-- Tree will be rendered here -->
+        </div>
+      </div>
+
+      <!-- Edit Panel -->
+      <div class="lg:w-1/4">
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 id="edit-panel-title" class="text-xl font-semibold text-gray-900 mb-4">编辑面板</h2>
+          <div id="edit-panel">
+            <p class="text-gray-500 text-center py-8">选择一个节点开始编辑</p>
+          </div>
+        </div>
+
+        <!-- Add New Property Panel -->
+        <div id="add-property-panel-container" class="bg-white rounded-lg shadow-md p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-4">添加新属性</h2>
+          <div id="add-property-panel">
+            <p class="text-gray-500 text-center py-8">选择一个节点添加新属性</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Version History Modal -->
+    <div id="version-history-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900">版本历史</h3>
+          <button id="close-version-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div id="version-list" class="space-y-4">
+          <!-- Version items will be rendered here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Version Modal -->
+    <div id="create-version-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900">创建新版本</h3>
+          <button id="close-create-version-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <form id="create-version-form">
+          <div class="form-group">
+            <label for="version-name" class="form-label">版本名称</label>
+            <input type="text" id="version-name" name="version-name" placeholder="例如: v1.0" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label for="version-description" class="form-label">版本描述</label>
+            <textarea id="version-description" name="version-description" placeholder="描述此版本的更改" class="form-textarea" rows="3"></textarea>
+          </div>
+          <div class="flex gap-2 mt-6">
+            <button type="submit" class="btn btn-primary flex-1">
+              <i class="fa fa-save mr-2"></i> 保存版本
+            </button>
+            <button type="button" id="cancel-create-version" class="btn btn-outline">
+              <i class="fa fa-times mr-2"></i> 取消
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Tags Management Modal -->
+    <div id="tags-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+      <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-auto">
+        <div class="flex justify-between items-center mb-6">
+          <h3 class="text-xl font-semibold text-gray-900">标签管理</h3>
+          <button id="close-tags-modal" class="text-gray-500 hover:text-gray-700">
+            <i class="fa fa-times text-xl"></i>
+          </button>
+        </div>
+        <div class="mb-6">
+          <h4 class="font-medium text-gray-900 mb-3">添加新标签</h4>
+          <form id="add-tag-form" class="flex gap-2">
+            <input type="text" id="tag-name" name="tag-name" placeholder="标签名称" class="form-input flex-1" required>
+            <input type="color" id="tag-color" name="tag-color" value="#3b82f6" class="w-12 h-10 rounded-md">
+            <button type="submit" class="btn btn-primary">
+              <i class="fa fa-plus mr-2"></i> 添加
+            </button>
+          </form>
+        </div>
+        <div>
+          <h4 class="font-medium text-gray-900 mb-3">现有标签</h4>
+          <div id="tags-list" class="space-y-3">
+            <!-- Tags will be rendered here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-12 text-center text-gray-600 text-sm">
+      <p>© 2026 Fraud Tree Editor | 基于 Occupational Fraud and Abuse Classification System</p>
+    </footer>
+  </div>
+
+  <script>
+    // 全局变量
+    let fraudTreeData = null;
+    let currentNode = null;
+    let currentPath = [];
+    let isEditing = false; // 跟踪是否处于编辑模式
+    let versionHistory = []; // 版本历史记录
+    let tags = []; // 标签列表
+    let currentTheme = 'light'; // 当前主题
+
+    // 初始化
+    function init() {
+      try {
+        console.log('开始初始化...');
+        
+        // 直接使用内联 JSON 数据（避免 CORS 问题）
+        fraudTreeData = {
+          "fraud_tree": {
+            "name": "Occupational Fraud and Abuse Classification System",
+            "categories": [
+              {
+                "id": "corruption",
+                "name": "Corruption",
+                "alias": "腐败",
+                "definition": "员工滥用其在业务交易中的影响力，违反其对雇主的职责以获取利益（例如，涉及贿赂或利益冲突的舞弊）。",
+                "case_percentage": 0.48,
+                "median_loss_usd": 200000,
+                "risk_characteristics": [
+                  "涉及第三方关系",
+                  "调查复杂度高",
+                  "难以通过内部控制发现",
+                  "通常需要外部举报",
+                  "可能涉及监管合规风险"
+                ],
+                "business_data_domains": [
+                  "采购系统",
+                  "供应商主数据",
+                  "合同管理系统",
+                  "销售交易记录",
+                  "招投标文档",
+                  "付款审批流",
+                  "利益冲突申报表"
+                ],
+                "subcategories": [
+                  {
+                    "id": "conflicts_of_interest",
+                    "name": "Conflicts of Interest",
+                    "alias": "利益冲突",
+                    "definition": "员工在业务交易中存在未披露的个人利益，影响其客观决策。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "隐蔽性强",
+                      "长期持续性",
+                      "涉及关联方交易"
+                    ],
+                    "business_data_domains": [
+                      "员工亲属关系申报",
+                      "供应商受益所有人信息",
+                      "关联交易记录"
+                    ],
+                    "schemes": [
+                      {
+                        "id": "purchasing_schemes",
+                        "name": "Purchasing Schemes",
+                        "alias": "采购舞弊",
+                        "definition": "员工利用采购职权为个人或关联方谋取不正当利益。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "涉及供应商选择偏见",
+                          "价格操纵"
+                        ],
+                        "business_data_domains": [
+                          "采购订单",
+                          "供应商评估报告",
+                          "比价记录"
+                        ]
+                      },
+                      {
+                        "id": "sales_schemes",
+                        "name": "Sales Schemes",
+                        "alias": "销售舞弊",
+                        "definition": "员工利用销售职权为个人或关联方谋取不正当利益。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "客户资源私用",
+                          "佣金转移"
+                        ],
+                        "business_data_domains": [
+                          "客户主数据",
+                          "销售合同",
+                          "佣金计算表"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "bribery",
+                    "name": "Bribery",
+                    "alias": "贿赂",
+                    "definition": "提供、给予、接受或索取有价值之物以影响业务决策。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "双向违法性",
+                      "现金或实物形式",
+                      "跨境合规风险高"
+                    ],
+                    "business_data_domains": [
+                      "费用报销系统",
+                      "礼品登记册",
+                      "银行流水",
+                      "现金日记账"
+                    ],
+                    "schemes": [
+                      {
+                        "id": "invoice_kickbacks",
+                        "name": "Invoice Kickbacks",
+                        "alias": "发票回扣",
+                        "definition": "供应商向采购方员工支付回扣以获取业务或提高价格。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "价格虚高",
+                          "虚假发票"
+                        ],
+                        "business_data_domains": [
+                          "发票数据",
+                          "付款记录",
+                          "供应商价格库"
+                        ]
+                      },
+                      {
+                        "id": "bid_rigging",
+                        "name": "Bid Rigging",
+                        "alias": "围标串标",
+                        "definition": "操纵招投标过程，使特定供应商中标。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "限制竞争",
+                          "价格同盟",
+                          "信息泄露"
+                        ],
+                        "business_data_domains": [
+                          "招投标文件",
+                          "投标方信息",
+                          "评标记录",
+                          "保证金流水"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "illegal_gratuities",
+                    "name": "Illegal Gratuities",
+                    "alias": "非法馈赠",
+                    "definition": "为获得业务优势而给予或接受的非法礼物或报酬，区别于贿赂在于不一定有明确的交换条件。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "灰色地带",
+                      "文化差异影响",
+                      "累积效应"
+                    ],
+                    "business_data_domains": [
+                      "礼品接收记录",
+                      "招待费明细",
+                      "差旅报销"
+                    ],
+                    "schemes": []
+                  },
+                  {
+                    "id": "economic_extortion",
+                    "name": "Economic Extortion",
+                    "alias": "经济勒索",
+                    "definition": "通过威胁或强迫获取利益，包括威胁曝光、破坏业务等手段。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "胁迫性",
+                      "可能涉及犯罪组织",
+                      "隐蔽支付"
+                    ],
+                    "business_data_domains": [
+                      "异常付款记录",
+                      "法律咨询费用",
+                      "安保支出"
+                    ],
+                    "schemes": []
+                  }
+                ]
+              },
+              {
+                "id": "asset_misappropriation",
+                "name": "Asset Misappropriation",
+                "alias": "资产挪用",
+                "definition": "员工窃取或滥用雇主的资源（例如，盗窃公司现金、虚假开票舞弊等）。",
+                "case_percentage": 0.89,
+                "median_loss_usd": 120000,
+                "risk_characteristics": [
+                  "发生频率最高",
+                  "单案损失相对较小",
+                  "内部控制可防范",
+                  "多为个人作案",
+                  "发现周期短"
+                ],
+                "business_data_domains": [
+                  "总账系统",
+                  "库存管理系统",
+                  "现金管理系统",
+                  "银行对账单",
+                  "固定资产登记",
+                  "费用报销系统"
+                ],
+                "subcategories": [
+                  {
+                    "id": "cash",
+                    "name": "Cash",
+                    "alias": "现金",
+                    "definition": "涉及现金及现金等价物的挪用或盗窃。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "流动性高",
+                      "难以追踪",
+                      "即时变现"
+                    ],
+                    "business_data_domains": [
+                      "现金日记账",
+                      "银行流水",
+                      "收银系统",
+                      "金库出入记录"
+                    ],
+                    "schemes": [
+                      {
+                        "id": "cash_on_hand_misappropriation",
+                        "name": "Cash-on-Hand Misappropriation",
+                        "alias": "手头现金挪用",
+                        "definition": "舞弊者在受害组织场所内挪用手头现金（例如，员工从公司收银机中窃取现金）。",
+                        "case_percentage": 0.11,
+                        "median_loss_usd": 50000,
+                        "risk_characteristics": [
+                          "物理接触现金",
+                          "小额多次",
+                          "收银岗位高发"
+                        ],
+                        "business_data_domains": [
+                          "收银机日志",
+                          "现金盘点表",
+                          "备用金领用记录",
+                          "POS交易数据"
+                        ],
+                        "sub_schemes": []
+                      },
+                      {
+                        "id": "theft_of_cash_receipts",
+                        "name": "Theft of Cash Receipts",
+                        "alias": "现金收入盗窃",
+                        "definition": "窃取组织已收到或应收的现金款项。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "涉及收入确认环节",
+                          "账面痕迹可追踪"
+                        ],
+                        "business_data_domains": [
+                          "应收账款明细",
+                          "收款记录",
+                          "存款单",
+                          "客户付款确认"
+                        ],
+                        "sub_schemes": [
+                          {
+                            "id": "skimming",
+                            "name": "Skimming",
+                            "alias": "瞒报收入",
+                            "definition": "在入账前窃取组织的进款（例如，员工接受客户付款但不记录销售，而是中饱私囊）。",
+                            "case_percentage": 0.10,
+                            "median_loss_usd": 43000,
+                            "risk_characteristics": [
+                              "最难被发现",
+                              "无账面记录",
+                              "现金业务高发",
+                              "需要绕过内部控制"
+                            ],
+                            "business_data_domains": [
+                              "销售流水",
+                              "客户对账单",
+                              "存货出库记录",
+                              "银行进账流水",
+                              "POS系统日志"
+                            ],
+                            "methods": [
+                              {
+                                "id": "sales_skimming",
+                                "name": "Sales",
+                                "alias": "销售瞒报",
+                                "definition": "对销售收款进行瞒报。",
+                                "techniques": [
+                                  {
+                                    "name": "Unrecorded",
+                                    "alias": "未入账",
+                                    "description": "完全不做销售记录，直接侵吞货款。"
+                                  },
+                                  {
+                                    "name": "Understated",
+                                    "alias": "低报",
+                                    "description": "记录部分金额，差额部分侵吞。"
+                                  }
+                                ]
+                              },
+                              {
+                                "id": "receivables_skimming",
+                                "name": "Receivables",
+                                "alias": "应收账款瞒报",
+                                "definition": "对客户还款进行瞒报或挪用。",
+                                "techniques": [
+                                  {
+                                    "name": "Write-Off Schemes",
+                                    "alias": "核销舞弊",
+                                    "description": "虚假核销应收账款以掩盖挪用行为。"
+                                  },
+                                  {
+                                    "name": "Lapping Schemes",
+                                    "alias": "截留挪用",
+                                    "description": "用后收到的款项冲抵前被挪用的款项，滚动掩盖。"
+                                  }
+                                ]
+                              },
+                              {
+                                "id": "refunds_skimming",
+                                "name": "Refunds and Other",
+                                "alias": "退款及其他瞒报",
+                                "definition": "对退款或其他收款进行瞒报。",
+                                "techniques": [
+                                  {
+                                    "name": "Unconcealed",
+                                    "alias": "未掩饰",
+                                    "description": "直接挪用不作任何掩饰，依赖监管缺失。"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "id": "cash_larceny",
+                            "name": "Cash Larceny",
+                            "alias": "现金盗窃",
+                            "definition": "在入账后窃取组织的进款（例如，员工在每日收入存入银行前窃取现金和支票）。",
+                            "case_percentage": 0.10,
+                            "median_loss_usd": 50000,
+                            "risk_characteristics": [
+                              "账面已记录",
+                              "需要破坏控制",
+                              "容易被发现"
+                            ],
+                            "business_data_domains": [
+                              "现金日记账",
+                              "银行对账单",
+                              "存款凭证",
+                              "现金盘点记录"
+                            ],
+                            "methods": [
+                              {
+                                "name": "Unconcealed",
+                                "alias": "未掩饰",
+                                "description": "直接盗窃现金，不做账目调整。"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "id": "fraudulent_disbursements",
+                        "name": "Fraudulent Disbursements",
+                        "alias": "欺诈性支出",
+                        "definition": "通过欺骗手段使组织支付虚假或不当的款项。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "涉及付款审批链",
+                          "需要伪造单据",
+                          "金额可大可小"
+                        ],
+                        "business_data_domains": [
+                          "应付账款系统",
+                          "付款审批流",
+                          "发票验证系统",
+                          "供应商主数据"
+                        ],
+                        "sub_schemes": [
+                          {
+                            "id": "billing_schemes",
+                            "name": "Billing Schemes",
+                            "alias": "开票舞弊",
+                            "definition": "通过提交虚假商品/服务发票、虚增发票或个人采购发票使雇主付款。",
+                            "case_percentage": 0.22,
+                            "median_loss_usd": 100000,
+                            "risk_characteristics": [
+                              "最常见的高损失舞弊",
+                              "涉及虚假供应商",
+                              "审批链绕过",
+                              "长期累积"
+                            ],
+                            "business_data_domains": [
+                              "发票影像系统",
+                              "采购订单",
+                              "收货确认单",
+                              "供应商银行信息",
+                              "合同管理系统"
+                            ],
+                            "methods": [
+                              {
+                                "name": "Shell Company",
+                                "alias": "空壳公司",
+                                "description": "设立或控制虚假公司，向雇主开具虚假发票。"
+                              },
+                              {
+                                "name": "Non-Accomplice Vendor",
+                                "alias": "非共谋供应商",
+                                "description": "利用真实供应商，通过篡改发票或重复提交进行舞弊。"
+                              },
+                              {
+                                "name": "Personal Purchases",
+                                "alias": "个人采购",
+                                "description": "购买个人物品，以公司名义开具发票报销。"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "payroll_schemes",
+                            "name": "Payroll Schemes",
+                            "alias": "工资舞弊",
+                            "definition": "通过虚假薪酬索赔使雇主付款。",
+                            "case_percentage": 0.10,
+                            "median_loss_usd": 50000,
+                            "risk_characteristics": [
+                              "涉及HR系统",
+                              "长期持续性",
+                              "难以察觉"
+                            ],
+                            "business_data_domains": [
+                              "HR系统",
+                              "考勤记录",
+                              "工资发放表",
+                              "员工主数据",
+                              "银行代发记录"
+                            ],
+                            "methods": [
+                              {
+                                "name": "Ghost Employee",
+                                "alias": "虚假员工",
+                                "description": "在工资系统中虚构员工，领取工资。"
+                              },
+                              {
+                                "name": "Falsified Wages",
+                                "alias": "虚报工资",
+                                "description": "虚报工时、加班或薪资标准。"
+                              },
+                              {
+                                "name": "Commission Schemes",
+                                "alias": "佣金舞弊",
+                                "description": "虚报销售业绩或佣金计算基础。"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "expense_reimbursement_schemes",
+                            "name": "Expense Reimbursement Schemes",
+                            "alias": "费用报销舞弊",
+                            "definition": "对虚构或虚增的业务费用申请报销。",
+                            "case_percentage": 0.13,
+                            "median_loss_usd": 50000,
+                            "risk_characteristics": [
+                              "高频小额",
+                              "审批流于形式",
+                              "个人消费混入"
+                            ],
+                            "business_data_domains": [
+                              "费用报销系统",
+                              "发票影像",
+                              "差旅预订系统",
+                              "信用卡账单",
+                              "审批流记录"
+                            ],
+                            "methods": [
+                              {
+                                "name": "Mischaracterized Expenses",
+                                "alias": "费用性质篡改",
+                                "description": "将个人消费伪装成业务费用报销。"
+                              },
+                              {
+                                "name": "Overstated Expenses",
+                                "alias": "虚增费用",
+                                "description": "夸大实际发生的费用金额。"
+                              },
+                              {
+                                "name": "Fictitious Expenses",
+                                "alias": "虚构费用",
+                                "description": "完全虚构未发生的费用。"
+                              },
+                              {
+                                "name": "Multiple Reimbursements",
+                                "alias": "重复报销",
+                                "description": "同一笔费用多次提交报销。"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "check_and_payment_tampering",
+                            "name": "Check and Payment Tampering",
+                            "alias": "支票与付款篡改",
+                            "definition": "通过拦截、伪造或篡改支票或电子付款窃取雇主资金。",
+                            "case_percentage": 0.11,
+                            "median_loss_usd": 155000,
+                            "risk_characteristics": [
+                              "欺诈性支出中损失最高",
+                              "涉及银行操作",
+                              "需要接触空白支票或付款权限"
+                            ],
+                            "business_data_domains": [
+                              "支票领用登记",
+                              "银行对账单",
+                              "付款指令系统",
+                              "电子银行流水",
+                              "印章使用记录"
+                            ],
+                            "methods": [
+                              {
+                                "name": "Forged Maker",
+                                "alias": "伪造出票人",
+                                "description": "伪造授权签字人签名开具支票。"
+                              },
+                              {
+                                "name": "Forged Endorsement",
+                                "alias": "伪造背书",
+                                "description": "伪造收款人背书转让支票。"
+                              },
+                              {
+                                "name": "Altered Payee",
+                                "alias": "篡改收款人",
+                                "description": "更改支票上的收款人信息。"
+                              },
+                              {
+                                "name": "Authorized Maker",
+                                "alias": "授权出票人",
+                                "description": "利用授权权限开具支票给自己或关联方。"
+                              }
+                            ]
+                          },
+                          {
+                            "id": "register_disbursement_schemes",
+                            "name": "Register Disbursement Schemes",
+                            "alias": "收银机支出舞弊",
+                            "definition": "通过虚假录入掩盖现金的欺诈性取出。",
+                            "case_percentage": 0.03,
+                            "median_loss_usd": 50000,
+                            "risk_characteristics": [
+                              "最少见",
+                              "零售行业高发",
+                              "利用系统漏洞"
+                            ],
+                            "business_data_domains": [
+                              "收银系统日志",
+                              "退款记录",
+                              "作废交易记录",
+                              "库存系统"
+                            ],
+                            "methods": [
+                              {
+                                "name": "False Voids",
+                                "alias": "虚假作废",
+                                "description": "虚假作废销售交易，实际已收款并侵吞。"
+                              },
+                              {
+                                "name": "False Refunds",
+                                "alias": "虚假退款",
+                                "description": "虚构退款交易，将现金取出。"
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "noncash_misappropriation",
+                    "name": "Noncash Misappropriation",
+                    "alias": "非现金资产挪用",
+                    "definition": "员工窃取或滥用受害组织的非现金资产（例如，从仓库窃取存货；窃取或滥用机密客户信息）。",
+                    "case_percentage": 0.22,
+                    "median_loss_usd": 66000,
+                    "risk_characteristics": [
+                      "实物资产为主",
+                      "需要转移或变现",
+                      "盘点可发现"
+                    ],
+                    "business_data_domains": [
+                      "库存管理系统",
+                      "固定资产登记",
+                      "无形资产清单",
+                      "出入库记录",
+                      "资产调拨单"
+                    ],
+                    "schemes": [
+                      {
+                        "id": "misuse",
+                        "name": "Misuse",
+                        "alias": "滥用",
+                        "definition": "未经授权使用公司资产。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "使用权侵占",
+                          "资产损耗",
+                          "难以量化损失"
+                        ],
+                        "business_data_domains": [
+                          "资产使用日志",
+                          "车辆GPS记录",
+                          "设备借用登记"
+                        ],
+                        "methods": [
+                          {
+                            "name": "Asset Requisitions and Transfers",
+                            "alias": "资产申请与转移",
+                            "description": "虚假申请或转移资产至个人使用。"
+                          },
+                          {
+                            "name": "False Sales and Shipping",
+                            "alias": "虚假销售与发货",
+                            "description": "以销售名义将资产转移，实际无收款。"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "larceny",
+                        "name": "Larceny",
+                        "alias": "盗窃",
+                        "definition": "窃取公司非现金资产。",
+                        "case_percentage": null,
+                        "median_loss_usd": null,
+                        "risk_characteristics": [
+                          "物理转移",
+                          "需要销赃渠道",
+                          "安全监控可防范"
+                        ],
+                        "business_data_domains": [
+                          "库存盘点表",
+                          "监控视频",
+                          "门禁记录",
+                          "资产标签系统"
+                        ],
+                        "methods": [
+                          {
+                            "name": "Purchasing and Receiving",
+                            "alias": "采购与收货",
+                            "description": "在采购收货环节窃取资产。"
+                          },
+                          {
+                            "name": "Unconcealed Larceny",
+                            "alias": "未掩饰盗窃",
+                            "description": "直接窃取不作掩饰。"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "financial_statement_fraud",
+                "name": "Financial Statement Fraud",
+                "alias": "财务报表欺诈",
+                "definition": "员工故意导致组织财务报告中重大信息的错报或遗漏（例如，记录虚构收入、低估报告费用或人为虚增报告资产）。",
+                "case_percentage": 0.05,
+                "median_loss_usd": 766000,
+                "risk_characteristics": [
+                  "低频高损",
+                  "管理层主导",
+                  "系统性舞弊",
+                  "审计风险高",
+                  "监管处罚重",
+                  "市场影响大"
+                ],
+                "business_data_domains": [
+                  "总账系统",
+                  "收入确认系统",
+                  "资产评估报告",
+                  "合并报表工作底稿",
+                  "会计估计变更记录",
+                  "关联方交易台账",
+                  "期后事项记录"
+                ],
+                "subcategories": [
+                  {
+                    "id": "net_worth_overstatements",
+                    "name": "Net Worth/Net Income Overstatements",
+                    "alias": "净资产/净收入高估",
+                    "definition": "通过虚增资产或收入、虚减负债或费用，高估企业财务状况或经营成果。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "业绩压力驱动",
+                      "迎合市场预期",
+                      "融资需求"
+                    ],
+                    "business_data_domains": [
+                      "收入明细账",
+                      "资产评估报告",
+                      "负债确认时点",
+                      "费用预提摊销表"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Timing Differences",
+                        "alias": "时间性差异",
+                        "description": "操纵收入或费用的确认时点，提前确认收入或推迟确认费用。"
+                      },
+                      {
+                        "name": "Fictitious Revenues",
+                        "alias": "虚构收入",
+                        "description": "记录虚假销售交易，无真实经济实质。"
+                      },
+                      {
+                        "name": "Concealed Liabilities and Expenses",
+                        "alias": "隐瞒负债与费用",
+                        "description": "不记录或延迟记录已发生的负债和费用。"
+                      },
+                      {
+                        "name": "Improper Asset Valuations",
+                        "alias": "不当资产估值",
+                        "description": "通过不合理的会计估计虚增资产价值。"
+                      },
+                      {
+                        "name": "Improper Disclosures",
+                        "alias": "不当披露",
+                        "description": "不充分披露重大信息或误导性陈述。"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "net_worth_understatements",
+                    "name": "Net Worth/Net Income Understatements",
+                    "alias": "净资产/净收入低估",
+                    "definition": "通过虚减资产或收入、虚增负债或费用，低估企业财务状况或经营成果。",
+                    "case_percentage": null,
+                    "median_loss_usd": null,
+                    "risk_characteristics": [
+                      "避税动机",
+                      "业绩平滑",
+                      "隐藏利润"
+                    ],
+                    "business_data_domains": [
+                      "税务申报表",
+                      "收入确认政策",
+                      "准备金计提表",
+                      "关联交易定价"
+                    ],
+                    "methods": [
+                      {
+                        "name": "Timing Differences",
+                        "alias": "时间性差异",
+                        "description": "推迟确认收入或提前确认费用。"
+                      },
+                      {
+                        "name": "Understated Revenues",
+                        "alias": "低估收入",
+                        "description": "少记或隐瞒实际销售收入。"
+                      },
+                      {
+                        "name": "Overstated Liabilities and Expenses",
+                        "alias": "高估负债与费用",
+                        "description": "虚增负债或费用项目。"
+                      },
+                      {
+                        "name": "Improper Asset Valuations",
+                        "alias": "不当资产估值",
+                        "description": "通过不合理减值虚减资产价值。"
+                      },
+                      {
+                        "name": "Improper Disclosures",
+                        "alias": "不当披露",
+                        "description": "隐瞒重要资产或收益来源。"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        };
+        
+        console.log('数据加载成功，开始渲染树结构...');
+        
+        // 渲染树结构
+        renderTree();
+        
+        console.log('树结构渲染成功，开始绑定事件...');
+        
+        // 绑定事件
+        bindEvents();
+        
+        console.log('初始化完成！');
+        
+        // 加载版本历史
+        loadVersionHistory();
+        
+        // 创建初始版本
+        if (versionHistory.length === 0) {
+          createInitialVersion();
+        }
+        
+        // 加载标签
+        loadTags();
+        
+        // 加载并应用主题
+        loadTheme();
+        applyTheme();
+        
+        // 显示成功消息
+        showMessage('Fraud Tree 数据加载成功', 'success');
+      } catch (error) {
+        console.error('初始化失败:', error);
+        alert('初始化失败，请检查控制台错误信息');
+      }
+    }
+
+    // 渲染树结构
+    function renderTree() {
+      const treeContainer = document.getElementById('tree-container');
+      treeContainer.innerHTML = '';
+      
+      const rootNode = fraudTreeData.fraud_tree;
+      const rootElement = createTreeNode(rootNode, 'root', [], true);
+      treeContainer.appendChild(rootElement);
+    }
+
+    // 创建树节点元素
+    function createTreeNode(node, id, path, isRoot = false) {
+      const nodeDiv = document.createElement('div');
+      nodeDiv.className = 'mb-2';
+      
+      // 节点头部
+      const nodeHeader = document.createElement('div');
+      nodeHeader.className = 'flex items-center gap-2 py-1';
+      
+      // 展开/折叠按钮
+      if (hasChildren(node)) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'text-gray-500 hover:text-primary focus:outline-none';
+        toggleBtn.innerHTML = '<i class="fa fa-caret-down"></i>';
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation();
+          toggleNode(nodeHeader.nextElementSibling, toggleBtn);
+        };
+        nodeHeader.appendChild(toggleBtn);
+      } else {
+        const spacer = document.createElement('div');
+        spacer.className = 'w-5';
+        nodeHeader.appendChild(spacer);
+      }
+      
+      // 节点名称（包含alias）
+      const nodeName = document.createElement('div');
+      nodeName.className = 'flex-1 font-medium text-gray-900 hover:text-primary cursor-pointer';
+      
+      // 拼接name和alias
+      let displayName = node.name || node.id;
+      if (node.alias) {
+        displayName += ` | ${node.alias}`;
+      }
+      
+      nodeName.textContent = displayName;
+      nodeName.onclick = () => selectNode(node, path.concat(id));
+      
+      // 添加 hover 效果
+      nodeName.addEventListener('mouseenter', () => {
+        // 如果处于编辑模式，不执行hover逻辑
+        if (!isEditing) {
+          // 在右侧面板显示属性值
+          showNodeProperties(node);
+        }
+      });
+      
+      // 当鼠标离开节点名称时
+      nodeName.addEventListener('mouseleave', () => {
+        // 不自动隐藏，保持显示状态
+        // 只有当鼠标离开整个树或hover其他节点时才会改变
+      });
+      
+      nodeHeader.appendChild(nodeName);
+      
+      // Case Percentage 圆环图
+      if (node.case_percentage !== null && node.case_percentage !== undefined) {
+        const percentage = Math.round(node.case_percentage * 100);
+        const casePercentageDiv = document.createElement('div');
+        casePercentageDiv.className = 'relative ml-2 flex-shrink-0';
+        casePercentageDiv.title = `Case Percentage: ${percentage}%`;
+        
+        // 创建圆环图 SVG
+        const svgSize = 36;
+        const strokeWidth = 4;
+        const radius = (svgSize - strokeWidth) / 2;
+        const circumference = radius * 2 * Math.PI;
+        const strokeDashoffset = circumference - (percentage / 100) * circumference;
+        
+        // 根据百分比设置颜色
+        let strokeColor;
+        if (percentage >= 75) {
+          strokeColor = '#ef4444'; // 红色
+        } else if (percentage >= 50) {
+          strokeColor = '#f59e0b'; // 黄色
+        } else if (percentage >= 25) {
+          strokeColor = '#10b981'; // 绿色
+        } else {
+          strokeColor = '#3b82f6'; // 蓝色
+        }
+        
+        casePercentageDiv.innerHTML = `
+          <svg width="${svgSize}" height="${svgSize}" class="transform -rotate-90">
+            <circle cx="${svgSize/2}" cy="${svgSize/2}" r="${radius}" stroke="#e5e7eb" stroke-width="${strokeWidth}" fill="none"/>
+            <circle cx="${svgSize/2}" cy="${svgSize/2}" r="${radius}" stroke="${strokeColor}" stroke-width="${strokeWidth}" fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}" stroke-linecap="round" class="transition-all duration-1500 ease-out" style="stroke-dashoffset: ${strokeDashoffset};"/>
+          </svg>
+          <div class="absolute inset-0 flex items-center justify-center text-xs font-bold">${percentage}%</div>
+        `;
+        
+        nodeHeader.appendChild(casePercentageDiv);
+      }
+      
+      // Median Loss Usd 显示
+      if (node.median_loss_usd !== null && node.median_loss_usd !== undefined) {
+        const medianLossDiv = document.createElement('div');
+        medianLossDiv.className = 'flex-shrink-0 ml-2';
+        
+        // 格式化金额
+        let formattedAmount;
+        if (node.median_loss_usd >= 1000000) {
+          formattedAmount = `$${(node.median_loss_usd / 1000000).toFixed(1)}M`;
+        } else if (node.median_loss_usd >= 1000) {
+          formattedAmount = `$${(node.median_loss_usd / 1000).toFixed(0)}K`;
+        } else {
+          formattedAmount = `$${node.median_loss_usd}`;
+        }
+        
+        // 根据损失金额设置颜色
+        let lossColor;
+        if (node.median_loss_usd >= 500000) {
+          lossColor = '#ef4444'; // 红色
+        } else if (node.median_loss_usd >= 100000) {
+          lossColor = '#f59e0b'; // 黄色
+        } else if (node.median_loss_usd >= 50000) {
+          lossColor = '#10b981'; // 绿色
+        } else {
+          lossColor = '#3b82f6'; // 蓝色
+        }
+        
+        medianLossDiv.innerHTML = `
+          <div class="text-sm font-bold" style="color: ${lossColor};">${formattedAmount}</div>
+          <div class="text-xs text-gray-500">Loss</div>
+        `;
+        medianLossDiv.title = `Median Loss: $${node.median_loss_usd.toLocaleString()}`;
+        nodeHeader.appendChild(medianLossDiv);
+      }
+      
+      // 如果节点有风险特征，添加风险等级指示器
+      if (node.risk_characteristics && node.risk_characteristics.length > 0) {
+        const riskLevel = Math.min(Math.ceil(node.risk_characteristics.length / 2), 5);
+        const riskIndicatorDiv = document.createElement('div');
+        riskIndicatorDiv.className = 'ml-2 flex-shrink-0';
+        riskIndicatorDiv.title = `Risk Level: ${riskLevel}/5 (${node.risk_characteristics.length} risk factors)`;
+        
+        let riskColor;
+        if (riskLevel >= 4) {
+          riskColor = '#ef4444'; // 红色
+        } else if (riskLevel >= 3) {
+          riskColor = '#f59e0b'; // 黄色
+        } else {
+          riskColor = '#10b981'; // 绿色
+        }
+        
+        riskIndicatorDiv.innerHTML = `
+          <div class="flex items-center">
+            <span class="text-xs font-medium mr-1">Risk:</span>
+            <div class="flex">
+              ${Array.from({ length: 5 }).map((_, i) => `
+                <div class="w-2 h-2 rounded-full mx-0.5" style="background-color: ${i < riskLevel ? riskColor : '#e5e7eb'};"></div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+        
+        nodeHeader.appendChild(riskIndicatorDiv);
+      }
+      
+      // 节点类型徽章
+      const nodeType = getNodeType(node);
+      const badge = document.createElement('span');
+      badge.className = `badge ${getBadgeClass(nodeType)} ml-2`;
+      badge.textContent = nodeType;
+      nodeHeader.appendChild(badge);
+      
+      // 编辑按钮
+      const editBtn = document.createElement('button');
+      editBtn.className = 'text-gray-500 hover:text-primary focus:outline-none ml-2';
+      editBtn.innerHTML = '<i class="fa fa-pencil"></i>';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        selectNode(node, path.concat(id));
+      };
+      nodeHeader.appendChild(editBtn);
+      
+      nodeDiv.appendChild(nodeHeader);
+      
+      // 子节点
+      if (hasChildren(node)) {
+        const childrenContainer = document.createElement('div');
+        childrenContainer.className = 'ml-4 border-l-2 border-gray-200 pl-4';
+        
+        const children = getChildren(node);
+        children.forEach((child, index) => {
+          const childId = Object.keys(child)[0];
+          const childNode = child[childId];
+          const childPath = path.concat(id);
+          
+          const childElement = createTreeNode(childNode, childId, childPath);
+          childrenContainer.appendChild(childElement);
+        });
+        
+        nodeDiv.appendChild(childrenContainer);
+      }
+      
+      return nodeDiv;
+    }
+
+    // 切换节点展开/折叠状态
+    function toggleNode(childrenContainer, toggleBtn) {
+      if (childrenContainer.style.display === 'none') {
+        childrenContainer.style.display = 'block';
+        toggleBtn.innerHTML = '<i class="fa fa-caret-down"></i>';
+      } else {
+        childrenContainer.style.display = 'none';
+        toggleBtn.innerHTML = '<i class="fa fa-caret-right"></i>';
+      }
+    }
+
+    // 检查节点是否有子节点
+    function hasChildren(node) {
+      console.log('检查节点是否有子节点:', node.name, {
+        categories: node.categories ? node.categories.length : 0,
+        subcategories: node.subcategories ? node.subcategories.length : 0,
+        schemes: node.schemes ? node.schemes.length : 0,
+        sub_schemes: node.sub_schemes ? node.sub_schemes.length : 0,
+        methods: node.methods ? node.methods.length : 0,
+        techniques: node.techniques ? node.techniques.length : 0
+      });
+      
+      const result = (
+        node.categories && node.categories.length > 0 ||
+        node.subcategories && node.subcategories.length > 0 ||
+        node.schemes && node.schemes.length > 0 ||
+        node.sub_schemes && node.sub_schemes.length > 0 ||
+        node.methods && node.methods.length > 0 ||
+        node.techniques && node.techniques.length > 0
+      );
+      
+      console.log('hasChildren结果:', result);
+      return result;
+    }
+
+    // 获取节点的子节点
+    function getChildren(node) {
+      console.log('获取节点的子节点:', node.name);
+      const children = [];
+      
+      if (node.categories && node.categories.length > 0) {
+        console.log('发现categories:', node.categories.length);
+        node.categories.forEach(category => {
+          children.push({ [category.id]: category });
+        });
+      }
+      
+      if (node.subcategories && node.subcategories.length > 0) {
+        console.log('发现subcategories:', node.subcategories.length);
+        node.subcategories.forEach(subcategory => {
+          children.push({ [subcategory.id]: subcategory });
+        });
+      }
+      
+      if (node.schemes && node.schemes.length > 0) {
+        console.log('发现schemes:', node.schemes.length);
+        node.schemes.forEach(scheme => {
+          children.push({ [scheme.id]: scheme });
+        });
+      }
+      
+      if (node.sub_schemes && node.sub_schemes.length > 0) {
+        console.log('发现sub_schemes:', node.sub_schemes.length);
+        node.sub_schemes.forEach(subScheme => {
+          children.push({ [subScheme.id]: subScheme });
+        });
+      }
+      
+      if (node.methods && node.methods.length > 0) {
+        console.log('发现methods:', node.methods.length);
+        node.methods.forEach(method => {
+          children.push({ [method.name || method.id]: method });
+        });
+      }
+      
+      if (node.techniques && node.techniques.length > 0) {
+        console.log('发现techniques:', node.techniques.length);
+        node.techniques.forEach(technique => {
+          children.push({ [technique.name || technique.id]: technique });
+        });
+      }
+      
+      console.log('子节点总数:', children.length);
+      return children;
+    }
+
+    // 获取节点类型
+    function getNodeType(node) {
+      if (node.subcategories) return 'Category';
+      if (node.schemes) return 'Subcategory';
+      if (node.sub_schemes) return 'Scheme';
+      if (node.methods) return 'Sub-scheme';
+      if (node.techniques) return 'Method';
+      return 'Technique';
+    }
+
+    // 获取徽章类名
+    function getBadgeClass(type) {
+      const classMap = {
+        'Category': 'badge-blue',
+        'Subcategory': 'badge-green',
+        'Scheme': 'badge-yellow',
+        'Sub-scheme': 'badge-red',
+        'Method': 'badge-purple',
+        'Technique': 'badge-gray'
+      };
+      return classMap[type] || 'badge-gray';
+    }
+
+    // 选择节点
+    function selectNode(node, path) {
+      currentNode = node;
+      currentPath = path;
+      isEditing = true; // 进入编辑模式
+      
+      // 显示编辑面板标题和添加新属性面板
+      const editPanelTitle = document.getElementById('edit-panel-title');
+      const addPropertyPanelContainer = document.getElementById('add-property-panel-container');
+      
+      if (editPanelTitle) {
+        editPanelTitle.style.display = 'block';
+      }
+      
+      if (addPropertyPanelContainer) {
+        addPropertyPanelContainer.style.display = 'block';
+      }
+      
+      // 更新编辑面板
+      updateEditPanel();
+      
+      // 更新添加属性面板
+      updateAddPropertyPanel();
+    }
+    
+    // 为树容器添加mouseleave事件，当鼠标离开树区域时恢复初始状态
+    document.addEventListener('DOMContentLoaded', function() {
+      const treeContainer = document.getElementById('tree-container');
+      treeContainer.addEventListener('mouseleave', () => {
+        // 如果处于编辑模式，不恢复初始状态
+        if (isEditing) {
+          return;
+        }
+        
+        // 延迟恢复，防止鼠标在树节点间移动时频繁切换
+        setTimeout(() => {
+          // 检查鼠标是否真的离开了树区域
+          if (!treeContainer.matches(':hover')) {
+            // 恢复编辑面板标题和添加新属性面板
+            const editPanelTitle = document.getElementById('edit-panel-title');
+            const addPropertyPanelContainer = document.getElementById('add-property-panel-container');
+            
+            if (editPanelTitle) {
+              editPanelTitle.style.display = 'block';
+            }
+            
+            if (addPropertyPanelContainer) {
+              addPropertyPanelContainer.style.display = 'block';
+            }
+            
+            // 恢复面板内容
+            const editPanel = document.getElementById('edit-panel');
+            editPanel.innerHTML = '<p class="text-gray-500 text-center py-8">选择一个节点开始编辑</p>';
+            
+            const addPropertyPanel = document.getElementById('add-property-panel');
+            addPropertyPanel.innerHTML = '<p class="text-gray-500 text-center py-8">选择一个节点添加新属性</p>';
+          }
+        }, 300);
+      });
+    });
+
+    // 更新编辑面板
+    function updateEditPanel() {
+      const editPanel = document.getElementById('edit-panel');
+      
+      if (!currentNode) {
+        editPanel.innerHTML = '<p class="text-gray-500 text-center py-8">选择一个节点开始编辑</p>';
+        return;
+      }
+      
+      // 生成编辑表单
+      let formHTML = `
+        <div class="edit-form">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">编辑节点: ${currentNode.name || currentNode.id}</h3>
+          <form id="edit-form">
+      `;
+      
+      // 遍历节点的所有属性
+      for (const [key, value] of Object.entries(currentNode)) {
+        // 处理数组类型的属性（risk_characteristics和business_data_domains）
+        if (Array.isArray(value) && (key === 'risk_characteristics' || key === 'business_data_domains')) {
+          formHTML += `
+            <div class="form-group mb-6">
+              <label class="form-label">${formatKey(key)}</label>
+              <div id="${key}-container" class="space-y-2">
+          `;
+          
+          // 显示现有值
+          value.forEach((item, index) => {
+            formHTML += `
+              <div class="flex items-center gap-2" data-index="${index}">
+                <input type="text" name="${key}[${index}]" value="${escapeHTML(item)}" class="form-input flex-1">
+                <button type="button" class="btn btn-danger btn-sm remove-item" data-key="${key}" data-index="${index}">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            `;
+          });
+          
+          // 添加新值的输入框
+          formHTML += `
+              <div class="flex items-center gap-2">
+                <input type="text" id="${key}-new" placeholder="添加新项" class="form-input flex-1">
+                <button type="button" class="btn btn-success btn-sm add-item" data-key="${key}">
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          `;
+        } else if (!Array.isArray(value)) {
+          // 处理非数组类型的属性
+          formHTML += `
+            <div class="form-group">
+              <label for="${key}" class="form-label">${formatKey(key)}</label>
+          `;
+          
+          if (typeof value === 'string') {
+            // 对于较长的字符串字段使用textarea
+            if (key === 'definition' || key === 'description') {
+              formHTML += `
+                <textarea id="${key}" name="${key}" rows="4" class="form-textarea">${escapeHTML(value)}</textarea>
+              `;
+            } else {
+              formHTML += `
+                <input type="text" id="${key}" name="${key}" value="${escapeHTML(value)}" class="form-input">
+              `;
+            }
+          } else if (typeof value === 'number') {
+            formHTML += `
+              <input type="number" id="${key}" name="${key}" value="${value}" class="form-input">
+            `;
+          } else if (typeof value === 'boolean') {
+            formHTML += `
+              <input type="checkbox" id="${key}" name="${key}" ${value ? 'checked' : ''} class="mt-1">
+            `;
+          } else if (value === null) {
+            formHTML += `
+              <input type="text" id="${key}" name="${key}" placeholder="输入值" class="form-input">
+            `;
+          }
+          
+          formHTML += `
+            </div>
+          `;
+        }
+      }
+      
+      // 为没有risk_characteristics的节点添加默认字段
+      if (!currentNode.risk_characteristics) {
+        formHTML += `
+          <div class="form-group mb-6">
+            <label class="form-label">Risk Characteristics</label>
+            <div id="risk_characteristics-container" class="space-y-2">
+              <div class="flex items-center gap-2">
+                <input type="text" id="risk_characteristics-new" placeholder="添加新项" class="form-input flex-1">
+                <button type="button" class="btn btn-success btn-sm add-item" data-key="risk_characteristics">
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      
+      // 为没有business_data_domains的节点添加默认字段
+      if (!currentNode.business_data_domains) {
+        formHTML += `
+          <div class="form-group mb-6">
+            <label class="form-label">Business Data Domains</label>
+            <div id="business_data_domains-container" class="space-y-2">
+              <div class="flex items-center gap-2">
+                <input type="text" id="business_data_domains-new" placeholder="添加新项" class="form-input flex-1">
+                <button type="button" class="btn btn-success btn-sm add-item" data-key="business_data_domains">
+                  <i class="fa fa-plus"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      
+      formHTML += `
+            <div class="flex gap-2 mt-6">
+              <button type="submit" class="btn btn-primary flex-1">
+                <i class="fa fa-save mr-2"></i> 保存更改
+              </button>
+              <button type="button" id="cancel-edit-btn" class="btn btn-outline">
+                <i class="fa fa-times mr-2"></i> 取消
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      
+      editPanel.innerHTML = formHTML;
+      
+      // 绑定表单提交事件
+      document.getElementById('edit-form').onsubmit = (e) => {
+        e.preventDefault();
+        saveNodeChanges();
+      };
+      
+      // 绑定取消按钮事件
+      document.getElementById('cancel-edit-btn').onclick = () => {
+        currentNode = null;
+        currentPath = [];
+        isEditing = false; // 退出编辑模式
+        
+        // 恢复编辑面板标题和添加新属性面板
+        const editPanelTitle = document.getElementById('edit-panel-title');
+        const addPropertyPanelContainer = document.getElementById('add-property-panel-container');
+        
+        if (editPanelTitle) {
+          editPanelTitle.style.display = 'block';
+        }
+        
+        if (addPropertyPanelContainer) {
+          addPropertyPanelContainer.style.display = 'block';
+        }
+        
+        updateEditPanel();
+        updateAddPropertyPanel();
+      };
+      
+      // 绑定添加数组项的事件
+      document.querySelectorAll('.add-item').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const key = this.getAttribute('data-key');
+          const newInput = document.getElementById(`${key}-new`);
+          const value = newInput.value.trim();
+          
+          if (value) {
+            const container = document.getElementById(`${key}-container`);
+            const index = container.children.length - 1; // 最后一个是添加按钮
+            
+            // 创建新的数组项输入框
+            const newItemDiv = document.createElement('div');
+            newItemDiv.className = 'flex items-center gap-2';
+            newItemDiv.dataset.index = index;
+            
+            newItemDiv.innerHTML = `
+              <input type="text" name="${key}[${index}]" value="${escapeHTML(value)}" class="form-input flex-1">
+              <button type="button" class="btn btn-danger btn-sm remove-item" data-key="${key}" data-index="${index}">
+                <i class="fa fa-trash"></i>
+              </button>
+            `;
+            
+            // 插入到添加按钮之前
+            container.insertBefore(newItemDiv, container.lastElementChild);
+            
+            // 清空添加输入框
+            newInput.value = '';
+            
+            // 重新绑定删除按钮事件
+            bindRemoveItemEvents();
+          }
+        });
+      });
+      
+      // 绑定删除数组项的事件
+      function bindRemoveItemEvents() {
+        document.querySelectorAll('.remove-item').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const key = this.getAttribute('data-key');
+            const index = this.getAttribute('data-index');
+            const itemDiv = this.closest('div[data-index]');
+            
+            if (itemDiv) {
+              itemDiv.remove();
+              
+              // 重新编号剩余的输入框
+              const container = document.getElementById(`${key}-container`);
+              const itemInputs = container.querySelectorAll('div[data-index]');
+              itemInputs.forEach((item, i) => {
+                item.dataset.index = i;
+                const input = item.querySelector('input');
+                if (input) {
+                  input.name = `${key}[${i}]`;
+                }
+                const removeBtn = item.querySelector('.remove-item');
+                if (removeBtn) {
+                  removeBtn.setAttribute('data-index', i);
+                }
+              });
+            }
+          });
+        });
+      }
+      
+      // 初始化删除按钮事件
+      bindRemoveItemEvents();
+    }
+
+    // 更新添加属性面板
+    function updateAddPropertyPanel() {
+      const addPropertyPanel = document.getElementById('add-property-panel');
+      
+      if (!currentNode) {
+        addPropertyPanel.innerHTML = '<p class="text-gray-500 text-center py-8">选择一个节点添加新属性</p>';
+        return;
+      }
+      
+      // 生成添加属性表单
+      const formHTML = `
+        <div class="edit-form">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">添加新属性</h3>
+          <form id="add-property-form">
+            <div class="form-group">
+              <label for="property-name" class="form-label">属性名称</label>
+              <input type="text" id="property-name" name="property-name" placeholder="例如: description" class="form-input" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="property-value" class="form-label">属性值</label>
+              <textarea id="property-value" name="property-value" placeholder="输入属性值" class="form-textarea" rows="3"></textarea>
+              <p id="array-hint" class="text-xs text-gray-500 mt-1 hidden">数组类型：请用逗号分隔多个值，例如：值1, 值2, 值3</p>
+            </div>
+            
+            <div class="form-group">
+              <label for="property-type" class="form-label">属性类型</label>
+              <select id="property-type" name="property-type" class="form-input">
+                <option value="string">字符串</option>
+                <option value="number">数字</option>
+                <option value="boolean">布尔值</option>
+                <option value="array">数组</option>
+              </select>
+            </div>
+            
+            <div class="flex gap-2 mt-6">
+              <button type="submit" class="btn btn-success flex-1">
+                <i class="fa fa-plus mr-2"></i> 添加属性
+              </button>
+              <button type="button" id="cancel-add-property-btn" class="btn btn-outline">
+                <i class="fa fa-times mr-2"></i> 取消
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      
+      addPropertyPanel.innerHTML = formHTML;
+      
+      // 绑定表单提交事件
+      document.getElementById('add-property-form').onsubmit = (e) => {
+        e.preventDefault();
+        addNewProperty();
+      };
+      
+      // 绑定取消按钮事件
+      document.getElementById('cancel-add-property-btn').onclick = () => {
+        currentNode = null;
+        currentPath = [];
+        updateEditPanel();
+        updateAddPropertyPanel();
+      };
+      
+      // 绑定属性类型变化事件，显示/隐藏数组输入提示
+      const propertyTypeSelect = document.getElementById('property-type');
+      const arrayHint = document.getElementById('array-hint');
+      
+      propertyTypeSelect.addEventListener('change', () => {
+        if (propertyTypeSelect.value === 'array') {
+          arrayHint.classList.remove('hidden');
+        } else {
+          arrayHint.classList.add('hidden');
+        }
+      });
+      
+      // 初始化时检查类型，显示相应提示
+      if (propertyTypeSelect.value === 'array') {
+        arrayHint.classList.remove('hidden');
+      }
+    }
+
+    // 保存节点更改
+    function saveNodeChanges() {
+      const form = document.getElementById('edit-form');
+      const formData = new FormData(form);
+      
+      // 处理数组类型的属性
+      const arrayProperties = ['risk_characteristics', 'business_data_domains'];
+      arrayProperties.forEach(key => {
+        const arrayValues = [];
+        let index = 0;
+        
+        // 收集所有数组项的值
+        while (true) {
+          const value = formData.get(`${key}[${index}]`);
+          if (value !== null) {
+            arrayValues.push(value);
+            index++;
+          } else {
+            break;
+          }
+        }
+        
+        // 如果有值，更新节点属性
+        if (arrayValues.length > 0) {
+          currentNode[key] = arrayValues;
+        } else {
+          // 如果没有值，删除该属性
+          delete currentNode[key];
+        }
+      });
+      
+      // 处理非数组类型的属性
+      for (const [key, value] of formData.entries()) {
+        // 跳过数组类型的属性（已经处理过）
+        if (arrayProperties.some(prop => key.startsWith(`${prop}[`))) {
+          continue;
+        }
+        
+        // 转换类型
+        const originalValue = currentNode[key];
+        if (typeof originalValue === 'number') {
+          currentNode[key] = parseFloat(value) || null;
+        } else if (typeof originalValue === 'boolean') {
+          currentNode[key] = value === 'on';
+        } else if (value === '') {
+          currentNode[key] = null;
+        } else {
+          currentNode[key] = value;
+        }
+      }
+      
+      // 重新渲染树
+      renderTree();
+      
+      // 显示成功消息
+      showMessage('更改已保存', 'success');
+      
+      // 保持编辑模式，用户可能需要继续编辑其他属性
+      // isEditing 保持为 true
+    }
+
+    // 添加新属性
+    function addNewProperty() {
+      const form = document.getElementById('add-property-form');
+      const formData = new FormData(form);
+      
+      const propertyName = formData.get('property-name');
+      let propertyValue = formData.get('property-value');
+      const propertyType = formData.get('property-type');
+      
+      // 转换类型
+      switch (propertyType) {
+        case 'number':
+          propertyValue = parseFloat(propertyValue) || 0;
+          break;
+        case 'boolean':
+          propertyValue = propertyValue === 'true' || propertyValue === '1';
+          break;
+        case 'array':
+          if (propertyValue.trim() === '') {
+            propertyValue = [];
+          } else {
+            propertyValue = propertyValue.split(',').map(item => item.trim()).filter(item => item !== '');
+          }
+          break;
+      }
+      
+      // 添加新属性
+      currentNode[propertyName] = propertyValue;
+      
+      // 更新编辑面板
+      updateEditPanel();
+      
+      // 显示成功消息
+      showMessage('属性已添加', 'success');
+    }
+
+    // 保存整个树
+    function saveTree() {
+      try {
+        // 转换为 JSON 字符串
+        const jsonString = JSON.stringify(fraudTreeData, null, 2);
+        
+        // 创建下载链接
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fraud_tree_updated.json';
+        a.click();
+        
+        // 释放 URL 对象
+        URL.revokeObjectURL(url);
+        
+        // 显示成功消息
+        showMessage('Fraud Tree 已保存', 'success');
+      } catch (error) {
+        console.error('保存失败:', error);
+        showMessage('保存失败，请重试', 'error');
+      }
+    }
+
+    // 显示消息
+    function showMessage(message, type = 'info') {
+      // 创建消息元素
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg ${getAlertClass(type)}`;
+      messageDiv.textContent = message;
+      
+      // 添加到页面
+      document.body.appendChild(messageDiv);
+      
+      // 3秒后移除
+      setTimeout(() => {
+        messageDiv.style.opacity = '0';
+        messageDiv.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+          document.body.removeChild(messageDiv);
+        }, 500);
+      }, 3000);
+    }
+
+    // 获取警报类名
+    function getAlertClass(type) {
+      const classMap = {
+        'success': 'bg-green-500 text-white',
+        'error': 'bg-red-500 text-white',
+        'info': 'bg-blue-500 text-white',
+        'warning': 'bg-yellow-500 text-white'
+      };
+      return classMap[type] || 'bg-blue-500 text-white';
+    }
+
+    // 格式化键名
+    function formatKey(key) {
+      return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    }
+
+    // 转义 HTML
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, function(match) {
+        const escapeMap = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        };
+        return escapeMap[match];
+      });
+    }
+
+    // 全部展开
+    function expandAll() {
+      const toggleButtons = document.querySelectorAll('.fa-caret-right');
+      toggleButtons.forEach(btn => {
+        btn.click();
+      });
+    }
+
+    // 全部折叠
+    function collapseAll() {
+      const toggleButtons = document.querySelectorAll('.fa-caret-down');
+      toggleButtons.forEach(btn => {
+        btn.click();
+      });
+    }
+
+    // 绑定事件
+    function bindEvents() {
+      // 保存按钮
+      document.getElementById('save-btn').onclick = saveTree;
+      
+      // 全部展开按钮
+      document.getElementById('expand-all-btn').onclick = expandAll;
+      
+      // 全部折叠按钮
+      document.getElementById('collapse-all-btn').onclick = collapseAll;
+      
+      // 版本控制按钮
+      document.getElementById('create-version-btn').onclick = () => {
+        document.getElementById('create-version-modal').classList.remove('hidden');
+      };
+      
+      document.getElementById('version-history-btn').onclick = showVersionHistory;
+      
+      // 版本模态框关闭按钮
+      document.getElementById('close-version-modal').onclick = () => {
+        document.getElementById('version-history-modal').classList.add('hidden');
+      };
+      
+      document.getElementById('close-create-version-modal').onclick = () => {
+        document.getElementById('create-version-modal').classList.add('hidden');
+      };
+      
+      document.getElementById('cancel-create-version').onclick = () => {
+        document.getElementById('create-version-modal').classList.add('hidden');
+      };
+      
+      // 创建版本表单提交
+      document.getElementById('create-version-form').onsubmit = (e) => {
+        e.preventDefault();
+        createVersion();
+      };
+      
+      // 标签管理按钮
+      document.getElementById('tags-btn').onclick = showTagsManagement;
+      
+      // 标签模态框关闭按钮
+      document.getElementById('close-tags-modal').onclick = () => {
+        document.getElementById('tags-modal').classList.add('hidden');
+      };
+      
+      // 添加标签表单提交
+      document.getElementById('add-tag-form').onsubmit = (e) => {
+        e.preventDefault();
+        addTag();
+      };
+      
+      // 主题切换按钮
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeDropdown = document.getElementById('theme-dropdown');
+      
+      themeToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        themeDropdown.classList.toggle('hidden');
+      });
+      
+      // 点击其他地方关闭主题下拉菜单
+      document.addEventListener('click', (e) => {
+        if (!themeToggle.contains(e.target) && !themeDropdown.contains(e.target)) {
+          themeDropdown.classList.add('hidden');
+        }
+      });
+      
+      // 主题选项点击事件
+      document.querySelectorAll('.theme-option').forEach(option => {
+        option.addEventListener('click', (e) => {
+          const theme = e.target.closest('.theme-option').getAttribute('data-theme');
+          setTheme(theme);
+          themeDropdown.classList.add('hidden');
+        });
+      });
+    }
+
+    // 在右侧面板显示节点属性
+    function showNodeProperties(node) {
+      const editPanel = document.getElementById('edit-panel');
+      
+      if (!node) {
+        editPanel.innerHTML = '<p class="text-gray-500 text-center py-8">选择一个节点开始编辑</p>';
+        return;
+      }
+      
+      // 生成属性展示面板（移除标题和编辑按钮）
+      let panelHTML = `
+        <div class="bg-white rounded-lg shadow-md p-4">
+      `;
+      
+      // 添加描述
+      if (node.definition || node.description) {
+        panelHTML += `
+          <div class="mb-6">
+            <h4 class="font-medium text-gray-700 mb-2 pb-1 border-b border-gray-200">描述</h4>
+            <p class="text-sm text-gray-600">${node.definition || node.description}</p>
+          </div>
+        `;
+      }
+      
+      // 添加其他属性
+      Object.entries(node).forEach(([key, value]) => {
+        // 跳过描述字段和基本信息
+        if (key === 'definition' || key === 'description' || key === 'name' || key === 'id') {
+          return;
+        }
+        
+        // 跳过子节点数组（如subcategories, schemes等）
+        if (Array.isArray(value) && (key === 'subcategories' || key === 'schemes' || key === 'sub_schemes' || key === 'methods' || key === 'techniques')) {
+          return;
+        }
+        
+        if (value !== null && value !== undefined) {
+          // 对于数组类型的属性（如risk_characteristics, business_data_domains）
+          if (Array.isArray(value) && value.length > 0) {
+            panelHTML += `
+              <div class="mb-6">
+                <h4 class="font-medium text-gray-700 mb-2 pb-1 border-b border-gray-200">${formatKey(key)}</h4>
+                <ul class="text-sm text-gray-600 list-disc list-inside space-y-1 pl-2">
+            `;
+            value.forEach(item => {
+              panelHTML += `
+                <li>${item}</li>
+              `;
+            });
+            panelHTML += `
+                </ul>
+              </div>
+            `;
+          } else if (!Array.isArray(value)) {
+            // 对于非数组类型的属性
+            panelHTML += `
+              <div class="mb-3">
+                <div class="flex items-center">
+                  <span class="text-sm font-medium text-gray-700 w-24">${formatKey(key)}:</span>
+                  <span class="text-sm text-gray-600">${value}</span>
+                </div>
+              </div>
+            `;
+          }
+        }
+      });
+      
+      panelHTML += `
+        </div>
+      `;
+      
+      editPanel.innerHTML = panelHTML;
+      
+      // 隐藏编辑面板标题和添加新属性面板
+      const editPanelTitle = document.getElementById('edit-panel-title');
+      const addPropertyPanelContainer = document.getElementById('add-property-panel-container');
+      
+      if (editPanelTitle) {
+        editPanelTitle.style.display = 'none';
+      }
+      
+      if (addPropertyPanelContainer) {
+        addPropertyPanelContainer.style.display = 'none';
+      }
+      
+      // 清空添加属性面板内容
+      const addPropertyPanel = document.getElementById('add-property-panel');
+      addPropertyPanel.innerHTML = '';
+    }
+
+    // 版本控制功能
+    
+    // 加载版本历史
+    function loadVersionHistory() {
+      try {
+        const storedHistory = localStorage.getItem('fraudTreeVersions');
+        if (storedHistory) {
+          versionHistory = JSON.parse(storedHistory);
+        }
+      } catch (error) {
+        console.error('加载版本历史失败:', error);
+        versionHistory = [];
+      }
+    }
+    
+    // 保存版本历史
+    function saveVersionHistory() {
+      try {
+        localStorage.setItem('fraudTreeVersions', JSON.stringify(versionHistory));
+      } catch (error) {
+        console.error('保存版本历史失败:', error);
+      }
+    }
+    
+    // 创建初始版本
+    function createInitialVersion() {
+      const initialVersion = {
+        id: Date.now(),
+        name: '初始版本',
+        description: 'Fraud Tree 初始数据',
+        timestamp: new Date().toISOString(),
+        data: JSON.parse(JSON.stringify(fraudTreeData))
+      };
+      
+      versionHistory.push(initialVersion);
+      saveVersionHistory();
+    }
+    
+    // 创建新版本
+    function createVersion() {
+      const form = document.getElementById('create-version-form');
+      const formData = new FormData(form);
+      
+      const versionName = formData.get('version-name');
+      const versionDescription = formData.get('version-description');
+      
+      const newVersion = {
+        id: Date.now(),
+        name: versionName,
+        description: versionDescription || '',
+        timestamp: new Date().toISOString(),
+        data: JSON.parse(JSON.stringify(fraudTreeData))
+      };
+      
+      versionHistory.push(newVersion);
+      saveVersionHistory();
+      
+      // 关闭模态框
+      document.getElementById('create-version-modal').classList.add('hidden');
+      
+      // 重置表单
+      form.reset();
+      
+      // 显示成功消息
+      showMessage('新版本已创建', 'success');
+    }
+    
+    // 显示版本历史
+    function showVersionHistory() {
+      const versionList = document.getElementById('version-list');
+      versionList.innerHTML = '';
+      
+      // 按时间倒序排列版本
+      const sortedVersions = [...versionHistory].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      
+      sortedVersions.forEach(version => {
+        const versionItem = document.createElement('div');
+        versionItem.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+        
+        const date = new Date(version.timestamp).toLocaleString();
+        
+        versionItem.innerHTML = `
+          <div class="flex justify-between items-start mb-2">
+            <h4 class="font-medium text-gray-900">${version.name}</h4>
+            <span class="text-xs text-gray-500">${date}</span>
+          </div>
+          ${version.description ? `<p class="text-sm text-gray-600 mb-3">${version.description}</p>` : ''}
+          <div class="flex gap-2 justify-end">
+            <button class="btn btn-outline btn-sm restore-version" data-version-id="${version.id}">
+              <i class="fa fa-check mr-1"></i> 恢复
+            </button>
+            <button class="btn btn-danger btn-sm delete-version" data-version-id="${version.id}">
+              <i class="fa fa-trash mr-1"></i> 删除
+            </button>
+          </div>
+        `;
+        
+        versionList.appendChild(versionItem);
+      });
+      
+      // 绑定恢复和删除按钮事件
+      document.querySelectorAll('.restore-version').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const versionId = parseInt(this.getAttribute('data-version-id'));
+          restoreVersion(versionId);
+        });
+      });
+      
+      document.querySelectorAll('.delete-version').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const versionId = parseInt(this.getAttribute('data-version-id'));
+          deleteVersion(versionId);
+        });
+      });
+      
+      // 显示模态框
+      document.getElementById('version-history-modal').classList.remove('hidden');
+    }
+    
+    // 恢复版本
+    function restoreVersion(versionId) {
+      const version = versionHistory.find(v => v.id === versionId);
+      if (version) {
+        fraudTreeData = JSON.parse(JSON.stringify(version.data));
+        renderTree();
+        
+        // 关闭模态框
+        document.getElementById('version-history-modal').classList.add('hidden');
+        
+        // 显示成功消息
+        showMessage(`已恢复到版本: ${version.name}`, 'success');
+      }
+    }
+    
+    // 删除版本
+    function deleteVersion(versionId) {
+      if (versionHistory.length <= 1) {
+        showMessage('至少需要保留一个版本', 'error');
+        return;
+      }
+      
+      versionHistory = versionHistory.filter(v => v.id !== versionId);
+      saveVersionHistory();
+      
+      // 重新显示版本历史
+      showVersionHistory();
+      
+      // 显示成功消息
+      showMessage('版本已删除', 'success');
+    }
+
+    // 标签管理功能
+    
+    // 加载标签
+    function loadTags() {
+      try {
+        const storedTags = localStorage.getItem('fraudTreeTags');
+        if (storedTags) {
+          tags = JSON.parse(storedTags);
+        }
+      } catch (error) {
+        console.error('加载标签失败:', error);
+        tags = [];
+      }
+    }
+    
+    // 保存标签
+    function saveTags() {
+      try {
+        localStorage.setItem('fraudTreeTags', JSON.stringify(tags));
+      } catch (error) {
+        console.error('保存标签失败:', error);
+      }
+    }
+    
+    // 显示标签管理界面
+    function showTagsManagement() {
+      const tagsList = document.getElementById('tags-list');
+      tagsList.innerHTML = '';
+      
+      if (tags.length === 0) {
+        tagsList.innerHTML = '<p class="text-gray-500 text-center py-4">暂无标签</p>';
+      } else {
+        tags.forEach(tag => {
+          const tagItem = document.createElement('div');
+          tagItem.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200';
+          
+          tagItem.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="w-6 h-6 rounded-full" style="background-color: ${tag.color}"></div>
+              <span class="font-medium">${tag.name}</span>
+            </div>
+            <div class="flex gap-2">
+              <button class="btn btn-outline btn-sm edit-tag" data-tag-id="${tag.id}">
+                <i class="fa fa-pencil mr-1"></i> 编辑
+              </button>
+              <button class="btn btn-danger btn-sm delete-tag" data-tag-id="${tag.id}">
+                <i class="fa fa-trash mr-1"></i> 删除
+              </button>
+            </div>
+          `;
+          
+          tagsList.appendChild(tagItem);
+        });
+        
+        // 绑定编辑和删除按钮事件
+        document.querySelectorAll('.edit-tag').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const tagId = parseInt(this.getAttribute('data-tag-id'));
+            editTag(tagId);
+          });
+        });
+        
+        document.querySelectorAll('.delete-tag').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const tagId = parseInt(this.getAttribute('data-tag-id'));
+            deleteTag(tagId);
+          });
+        });
+      }
+      
+      // 显示模态框
+      document.getElementById('tags-modal').classList.remove('hidden');
+    }
+    
+    // 添加标签
+    function addTag() {
+      const form = document.getElementById('add-tag-form');
+      const formData = new FormData(form);
+      
+      const tagName = formData.get('tag-name').trim();
+      const tagColor = formData.get('tag-color');
+      
+      if (!tagName) {
+        showMessage('标签名称不能为空', 'error');
+        return;
+      }
+      
+      // 检查标签是否已存在
+      if (tags.some(tag => tag.name === tagName)) {
+        showMessage('标签已存在', 'error');
+        return;
+      }
+      
+      const newTag = {
+        id: Date.now(),
+        name: tagName,
+        color: tagColor
+      };
+      
+      tags.push(newTag);
+      saveTags();
+      
+      // 重置表单
+      form.reset();
+      document.getElementById('tag-color').value = '#3b82f6';
+      
+      // 重新显示标签管理界面
+      showTagsManagement();
+      
+      // 显示成功消息
+      showMessage('标签已添加', 'success');
+    }
+    
+    // 编辑标签
+    function editTag(tagId) {
+      const tag = tags.find(t => t.id === tagId);
+      if (!tag) return;
+      
+      const newName = prompt('输入新的标签名称:', tag.name);
+      if (newName === null) return;
+      
+      const trimmedName = newName.trim();
+      if (!trimmedName) {
+        showMessage('标签名称不能为空', 'error');
+        return;
+      }
+      
+      // 检查标签是否已存在
+      if (tags.some(t => t.name === trimmedName && t.id !== tagId)) {
+        showMessage('标签已存在', 'error');
+        return;
+      }
+      
+      const newColor = prompt('输入新的标签颜色 (十六进制):', tag.color);
+      if (newColor === null) return;
+      
+      // 验证颜色格式
+      const colorRegex = /^#[0-9A-Fa-f]{6}$/;
+      if (!colorRegex.test(newColor)) {
+        showMessage('无效的颜色格式，请使用十六进制颜色代码', 'error');
+        return;
+      }
+      
+      tag.name = trimmedName;
+      tag.color = newColor;
+      saveTags();
+      
+      // 重新显示标签管理界面
+      showTagsManagement();
+      
+      // 显示成功消息
+      showMessage('标签已更新', 'success');
+    }
+    
+    // 删除标签
+    function deleteTag(tagId) {
+      if (confirm('确定要删除这个标签吗？')) {
+        tags = tags.filter(tag => tag.id !== tagId);
+        saveTags();
+        
+        // 重新显示标签管理界面
+        showTagsManagement();
+        
+        // 显示成功消息
+        showMessage('标签已删除', 'success');
+      }
+    }
+
+    // 主题管理功能
+    
+    // 加载主题
+    function loadTheme() {
+      try {
+        const storedTheme = localStorage.getItem('fraudTreeTheme');
+        if (storedTheme) {
+          currentTheme = storedTheme;
+        } else {
+          // 默认为系统主题
+          currentTheme = 'system';
+        }
+      } catch (error) {
+        console.error('加载主题失败:', error);
+        currentTheme = 'light';
+      }
+    }
+    
+    // 保存主题
+    function saveTheme() {
+      try {
+        localStorage.setItem('fraudTreeTheme', currentTheme);
+      } catch (error) {
+        console.error('保存主题失败:', error);
+      }
+    }
+    
+    // 设置主题
+    function setTheme(theme) {
+      currentTheme = theme;
+      saveTheme();
+      applyTheme();
+      
+      // 显示成功消息
+      let themeName = '';
+      switch (theme) {
+        case 'light':
+          themeName = '浅色主题';
+          break;
+        case 'dark':
+          themeName = '深色主题';
+          break;
+        case 'system':
+          themeName = '系统主题';
+          break;
+      }
+      showMessage(`已切换到 ${themeName}`, 'success');
+    }
+    
+    // 应用主题
+    function applyTheme() {
+      let themeToApply = currentTheme;
+      
+      // 如果是系统主题，检测系统偏好
+      if (currentTheme === 'system') {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          themeToApply = 'dark';
+        } else {
+          themeToApply = 'light';
+        }
+      }
+      
+      // 移除现有的主题类
+      document.documentElement.classList.remove('dark');
+      
+      // 应用新主题
+      if (themeToApply === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.getElementById('theme-toggle').innerHTML = '<i class="fa fa-sun-o mr-2"></i> 主题';
+      } else {
+        document.getElementById('theme-toggle').innerHTML = '<i class="fa fa-moon-o mr-2"></i> 主题';
+      }
+      
+      // 更新主题下拉菜单的样式
+      const themeDropdown = document.getElementById('theme-dropdown');
+      if (themeToApply === 'dark') {
+        themeDropdown.classList.add('bg-gray-800', 'text-white');
+        themeDropdown.classList.remove('bg-white', 'text-gray-700');
+        
+        const themeOptions = themeDropdown.querySelectorAll('.theme-option');
+        themeOptions.forEach(option => {
+          option.classList.add('text-gray-200', 'hover:bg-gray-700');
+          option.classList.remove('text-gray-700', 'hover:bg-gray-100');
+        });
+      } else {
+        themeDropdown.classList.add('bg-white', 'text-gray-700');
+        themeDropdown.classList.remove('bg-gray-800', 'text-white');
+        
+        const themeOptions = themeDropdown.querySelectorAll('.theme-option');
+        themeOptions.forEach(option => {
+          option.classList.add('text-gray-700', 'hover:bg-gray-100');
+          option.classList.remove('text-gray-200', 'hover:bg-gray-700');
+        });
+      }
+    }
+    
+    // 监听系统主题变化
+    if (window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        if (currentTheme === 'system') {
+          applyTheme();
+        }
+      });
+    }
+
+    // 初始化应用
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Claude Code 本地设置（含用户权限、禁用列表）
+.claude/settings.local.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# 日志
+*.log

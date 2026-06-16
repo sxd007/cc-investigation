@@ -1,0 +1,133 @@
+# cc-investigation — 插件开发指南
+
+本文件是本仓库（cc-investigation 插件项目）的**开发者指南**，指导 AI 协助开发者维护和扩展本插件。
+
+**这不是用户指南。** 用户指南位于 `project-templates/default/CLAUDE.md`，分发到调查员的案件项目中使用。
+
+---
+
+## 一、项目总览
+
+cc-investigation 是一个 Claude Code 插件，为反舞弊调查提供技能体系、命令入口和专项代理。
+
+### 分发机制
+
+用户通过 `/plugin install cc-investigation` 安装时，安装器读取 `manifests/install-modules.json` 中每个模块的 `paths` 字段来定位分发文件。**根部 CLAUDE.md 不在任何模块的 paths 中，不会被分发。**
+
+### 开发者 vs 用户 上下文隔离
+
+| 文件 | 谁读 | 作用 |
+|------|------|------|
+| `CLAUDE.md`（本文件） | 开发者 + AI | 插件开发操作指南 |
+| `project-templates/default/CLAUDE.md` | 调查员 + AI | 调查案件操作指南（分发后） |
+| `DEVELOPMENT_GUIDE.md` | 人类开发者 | 架构说明、构建方式 |
+| `README.md`（有的话） | GitHub 访客 | 项目简介、安装说明 |
+
+---
+
+> 完整目录结构及架构分类说明见 [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md#三目录结构)
+
+---
+
+## 二、开发任务 SOP
+
+### 3.1 添加新场景技能（fraud-xxx）
+
+新增一个 `fraud-<domain>` 场景技能时，必须依次修改以下 6 个文件：
+
+| # | 文件 | 操作 |
+|---|------|------|
+| 1 | `skills/fraud-xxx/SKILL.md` | 创建技能文件，按 ACFE 分类编写 |
+| 2 | `manifests/install-modules.json` | 添加模块条目（id、paths、dependencies） |
+| 3 | `manifests/install-profiles.json` | 加入 `investigator` 和 `full` 两套 profile |
+| 4 | `skills/fraud-classification/SKILL.md` | 在"专题舞弊类型索引"表追加一行 |
+| 5 | `agents/investigation-planner.md` | 在 Related 技能段追加引用 |
+| 6 | `agents/fraud-type-classifier.md` | 在 Cross-Reference 段和 Related 段追加引用 |
+
+此外，模板中的技能表也应同步更新。
+
+**模块注册 (`install-modules.json`) 模板：**
+```json
+{
+  "id": "fraud-xxx",
+  "kind": "skills",
+  "description": "一句话描述",
+  "paths": ["skills/fraud-xxx"],
+  "targets": ["claude", "claude-project"],
+  "dependencies": ["investigation-foundation", "fraud-classification"],
+  "defaultInstall": false,
+  "cost": "medium",
+  "stability": "alpha"
+}
+```
+
+### 3.2 更新技能内容
+
+- 每个技能目录必须包含 `SKILL.md`
+- 如需配套脚本，放在 `skills/<skill>/scripts/` 下
+- 跨文件引用使用相对路径（相对于仓库根）
+
+### 3.3 修改代理定义
+
+代理文件在 `agents/` 目录下，每文件包含：
+- frontmatter（name、description）
+- Role 定义
+- Process 流程
+- Related 段（引用相关技能）
+
+修改后需确认 Related 段中的路径引用正确。
+
+### 3.4 修改命令
+
+命令文件在 `commands/` 目录下。每个命令一个 `.md` 文件。
+
+### 3.5 修改模板
+
+`project-templates/default/CLAUDE.md` 是分发到调查项目的用户指南，其技能表、命令表需要同步更新。
+
+---
+
+> 完整编写规范（MCP 格式、阶段定义、命名、决策树等）见 [`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md#五编写规范)
+
+---
+
+## 三、当前模块清单状态
+
+所有注册模块见 `manifests/install-modules.json`，当前状态：
+
+| 模块 | 成本 | 稳定性 | 开发者 |
+|------|------|--------|--------|
+| rules-core | light | stable | 核心 |
+| agents-core | light | stable | 核心 |
+| commands-core | medium | stable | 核心 |
+| platform-configs | light | stable | 核心 |
+| investigation-foundation | medium | stable | 核心 |
+| fraud-classification | heavy | stable | 核心 |
+| evidence-management | medium | stable | 核心 |
+| writing-reporting | medium | stable | 核心 |
+| interview-analysis | medium | stable | 核心 |
+| data-analysis | medium | stable | 核心 |
+| investigation-techniques | heavy | stable | 核心 |
+| case-management | medium | beta | 核心 |
+| mcp-integration | medium | stable | 核心 |
+| cold-start-interview | light | stable | 核心 |
+| fraud-channel | heavy | beta | 核心 |
+| fraud-reimbursement | medium | alpha | 开发者 |
+| fraud-procurement | medium | alpha | 开发者 |
+| fraud-bid-rigging | medium | alpha | 开发者 |
+| fraud-ip | medium | alpha | 开发者 |
+| fraud-hr | medium | alpha | 开发者 |
+| fraud-fake-chop | light | alpha | 开发者 |
+| fraud-conflicts-of-interest | medium | alpha | 开发者 |
+| order-execution-variance-analysis | medium | beta | 核心 |
+| investigation-memory | light | beta | 核心 |
+| case-retrospective | light | beta | 核心 |
+
+---
+
+## 四、相关资源
+
+- `DEVELOPMENT_GUIDE.md` — 架构设计、插件扩展、构建发布的完整指南
+- `manifests/install-modules.json` — 模块注册表（必读）
+- `manifests/install-profiles.json` — 安装配置集
+- `project-templates/default/CLAUDE.md` — 用户指南（分发物）
