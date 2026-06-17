@@ -6,7 +6,11 @@ origin: cc-investigation
 
 # 渠道舞弊调查
 
-适用于 硬件（含服务）特价订单的渠道舞弊调查。核心矛盾：**申报链路与实际链路之间的差异，即信息不对称引发的舞弊行为**。
+适用于硬件（含服务）特价订单渠道销售场景的舞弊调查。
+
+渠道销售舞弊的本质：**销售和（或）代理商利用特价申报环节与实际执行环节的信息不对称牟利——在申报端通过夸大竞争、虚构第三方成本、隐瞒渠道链路、强调终端客户价值来逃避合规审查、骗取更低折扣；在执行端偏离申报内容获取不当利益。**
+
+调查的切入口：**查清特价项目是如何申报的，又是如何执行的，找到两者之间的偏差。**
 
 渠道舞弊涉及六种常见模式，它们在同一个案件中往往同时出现（如虚报终端客户可能伴随渠道窜货，第三方成本造假可能伴随隐瞒渠道链路）。调查的关键是从单一信号出发，识别出可能共存的模式组合。
 
@@ -33,6 +37,17 @@ origin: cc-investigation
 - 销售数据出现无法解释的异常（高返点、异常折扣、批量退货等）
 - 需要设计渠道舞弊调查方案
 - 需要调查渠道窜货、假单、虚假终端客户等特定问题
+
+***
+
+## 六种模式的框架定位
+
+特价订单生命周期：**发起 → 申报 → 审批 → 执行**。
+
+| 缺口       | 涉及模式                    |
+| -------- | ----------------------- |
+| **申报虚构** | 虚报终端客户、成本造假、拼单绑单、隐瞒渠道链路 |
+| **执行偏差** | 渠道窜货、隐瞒渠道利润             |
 
 ***
 
@@ -210,9 +225,7 @@ origin: cc-investigation
 
 ## Related
 
-- **Skills:** [舞弊分类与路由](../fraud-classification/SKILL.md), [调查哲学与方法论](../investigation-foundation/SKILL.md), [数据分析与审计技术](../data-analysis/SKILL.md), [访谈与问话分析](../interview-analysis/SKILL.md), [证据链与底稿管理](../evidence-management/SKILL.md), [项目执行差异分析](../order-execution-variance-analysis/SKILL.md)（链路对比工具）
+- **Skills:** [舞弊分类与路由](../fraud-classification/SKILL.md), [调查哲学与方法论](../investigation-foundation/SKILL.md), [数据分析与审计技术](../data-analysis/SKILL.md), [访谈与问话分析](../interview-analysis/SKILL.md), [证据链与底稿管理](../evidence-management/SKILL.md), [项目执行差异分析](../order-execution-variance-analysis/SKILL.md)（订单申报与执行差异，包括链路、资金等对比工具）
 - **Agents:** `investigation-planner` 调查方案设计、`evidence-analyzer` 证据分析
 - **References:** `references/interview-questions/` 渠道场景访谈问题库
-
-  <br />
 
