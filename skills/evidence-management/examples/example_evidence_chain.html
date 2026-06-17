@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>证据链可视化 — 调查底稿</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-deep:#0f1923;--bg-panel:#162030;--bg-card:#1d2d3f;--bg-hover:#243548;
+  --border:#2a3f56;--border-lit:#3a5570;
+  --text-primary:#d8e6f0;--text-secondary:#7a9bb5;--text-dim:#4a6880;--text-id:#4ecdc4;
+  --amber:#e8a020;--amber-dim:#7a520f;--teal:#4ecdc4;--teal-dim:#1a4f4c;
+  --green:#52c97a;--red:#e85c5c;--purple:#9b7ae8;
+  --c-evidence:#7a9bb5;--c-clue:#4ecdc4;--c-argument:#9b7ae8;--c-finding:#e8a020;
+  --c-entity:#5a8aaa;--c-hypothesis:#c89050;--c-event:#7aaa5a;
+  --radius:6px;--radius-lg:10px;
+  --font-mono:'SF Mono','Fira Code','Cascadia Code',monospace;
+  --font-body:'Inter',system-ui,-apple-system,sans-serif
+}
+body{background:var(--bg-deep);color:var(--text-primary);font-family:var(--font-body);font-size:14px;line-height:1.6;min-height:100vh}
+.app{display:flex;flex-direction:column;height:100vh}
+.topbar{background:var(--bg-panel);border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;flex-shrink:0;gap:12px}
+.case-badge{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;padding:3px 10px;border-radius:3px;font-weight:600;flex-shrink:0}
+.case-title{font-size:15px;font-weight:600}
+.case-subtitle{font-size:12px;color:var(--text-secondary)}
+.topbar-stats{display:flex;gap:8px;font-size:11px;color:var(--text-dim);margin-left:auto;flex-shrink:0}
+.stat-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:2px}
+.dot-ready{background:var(--green);box-shadow:0 0 4px var(--green)}
+.dot-draft{background:var(--amber);box-shadow:0 0 4px var(--amber)}
+.dot-superseded{background:var(--text-dim)}
+.workspace{flex:1;overflow:hidden;display:flex}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-lit);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#4a6880}
+
+/* ── XMind 左→右逻辑图 ─────────────────────────────────── */
+.xmind-wrap{flex:1;overflow:auto;display:flex;flex-direction:column}
+.xmind-toolbar{padding:6px 0;flex-shrink:0}
+.xmind-content{flex:1;position:relative}
+.xmind-card{position:absolute;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;cursor:pointer;transition:all .12s;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.xmind-card:hover{background:var(--bg-hover);border-color:var(--border-lit);z-index:2}
+.xmind-card .x-top{display:flex;align-items:center;gap:6px}
+.xmind-card .x-id{font-family:var(--font-mono);font-size:10px;color:var(--text-id);flex-shrink:0}
+.xmind-card .x-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-left:auto;border:1px solid rgba(0,0,0,.3)}
+.xmind-card .x-title{font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;word-break:break-all;color:var(--text-secondary);min-width:0}
+.xmind-card-l1{min-width:150px;border-left:3px solid var(--c-finding);z-index:1}
+.xmind-card-l1 .x-title{font-weight:600;color:var(--text-primary);font-size:12px;max-height:33px}
+.xmind-card-l2{min-width:130px;border-left:3px solid var(--c-argument)}
+.xmind-card-l2 .x-title{max-height:30px}
+.xmind-card-l3{min-width:110px;border-left:3px solid var(--c-clue)}
+.xmind-card-l3 .x-title{max-height:30px}
+.xmind-card-l4{min-width:90px;padding:4px 8px;border-left:3px solid var(--c-evidence)}
+.xmind-card-l4 .x-title{font-size:10px;max-height:27px}
+
+/* ── 折叠按钮 ────────────────────────────────────────── */
+.x-collapse-btn{position:absolute;border:none;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-id);font-size:10px;cursor:pointer;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:3;line-height:1;padding:0;transition:all .12s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.x-collapse-btn:hover{background:var(--teal-dim);border-color:var(--teal);color:var(--teal)}
+
+/* ── 详情面板 ────────────────────────────────────────── */
+.detail-panel{flex:0 0 30%;background:var(--bg-panel);border-left:1px solid var(--border);overflow-y:auto;display:none;flex-direction:column}
+.detail-panel.open{display:flex}
+.panel-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.panel-id{font-family:var(--font-mono);font-size:11px;font-weight:700;flex-shrink:0}
+.panel-title{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.panel-close{background:none;border:none;color:var(--text-dim);font-size:16px;cursor:pointer;padding:1px 6px;border-radius:var(--radius);flex-shrink:0}
+.panel-close:hover{color:var(--text-primary);background:var(--bg-hover)}
+.panel-body{padding:14px;font-size:13px;line-height:1.7;overflow-y:auto;flex:1}
+.panel-body h3{font-size:14px;color:var(--text-primary);margin:12px 0 6px}
+.panel-body h4{font-size:13px;color:var(--text-primary);margin:8px 0 4px}
+.panel-body p{margin:6px 0;color:var(--text-secondary)}
+.panel-body ul{padding-left:18px;margin:4px 0}
+.panel-body li{margin:2px 0;color:var(--text-secondary)}
+.panel-body code{background:var(--bg-card);padding:1px 4px;border-radius:3px;font-size:12px;color:var(--teal)}
+.panel-body strong{color:var(--text-primary)}
+.panel-body .panel-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.panel-body .panel-meta-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px}
+.panel-body .panel-meta-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);margin-bottom:1px}
+.panel-body .panel-meta-value{font-size:12px}
+.panel-body .panel-source{display:flex;align-items:center;gap:5px;padding:4px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;margin:3px 0;font-size:11px;transition:background .15s}
+.panel-body .panel-source:hover{background:var(--bg-hover)}
+.panel-body .panel-source-id{font-family:var(--font-mono);font-size:10px;color:var(--text-id);flex-shrink:0}
+.panel-body .panel-source-excerpt{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.btn-sm{background:var(--bg-deep);border:1px solid var(--border);color:var(--text-dim);font-size:11px;padding:3px 10px;border-radius:var(--radius);cursor:pointer;font-family:var(--font-body);transition:all .12s;white-space:nowrap}
+.btn-sm:hover{border-color:var(--teal);color:var(--teal)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <span class="case-badge" id="case-badge">CASE</span>
+    <div>
+      <div class="case-title" id="case-title">—</div>
+      <div class="case-subtitle" id="case-subtitle">—</div>
+    </div>
+    <div class="topbar-stats" id="stats-bar"></div>
+  </div>
+  <div class="workspace">
+    <div class="xmind-wrap" id="view-xmind">
+      <div class="xmind-toolbar"><button class="btn-sm" id="btn-collapse-all" onclick="toggleAllCollapse()">⊟ 全部</button></div>
+      <div id="xmind-content"></div>
+    </div>
+    <div class="detail-panel" id="detail-panel">
+      <div class="panel-header">
+        <div class="panel-id" id="panel-id" style="color:var(--c-finding)">—</div>
+        <div class="panel-title" id="panel-title">—</div>
+        <button class="panel-close" onclick="closeDetailPanel()">✕</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+  </div>
+</div>
+<script>
+// INJECTION_START_MARKER
+
+const CASE_DATA = {
+  "id": "CASE-20XX-XXXX",
+  "title": "李某虚构项目名称申报假单",
+  "subtitle": "2026-06-14",
+  "stats": {
+    "total": 23,
+    "types": {
+      "EV": 8,
+      "FND": 6,
+      "ARG": 4,
+      "LS": 5
+    },
+    "statuses": {
+      "ready": 21,
+      "draft": 2,
+      "superseded": 0
+    }
+  }
+};
+
+const NODES_DATA = {
+  "EV-001": {
+    "id": "EV-001",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认项目名称\"扩容\"是虚构的，正常项目名称应为\"甲企业网络设备采购\"",
+    "body": "",
+    "assertion": "李某承认项目名称\"扩容\"是虚构的，正常项目名称应为\"甲企业网络设备采购\"",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-05-22",
+    "collected_by": "调查员A、调查员B",
+    "source": "李某第三轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-002": {
+    "id": "EV-002",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认隐瞒了渠道商甲到下游渠道商乙的渠道链路",
+    "body": "",
+    "assertion": "李某承认隐瞒了渠道商甲到下游渠道商乙的渠道链路",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-04-14",
+    "collected_by": "调查员A、调查员C",
+    "source": "李某第一轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-003": {
+    "id": "EV-003",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认后期与渠道商乙沟通，每片网卡帮渠道商甲多杀价100元，导致实际渠道利润高于报备",
+    "body": "",
+    "assertion": "李某承认后期与渠道商乙沟通，每片网卡帮渠道商甲多杀价100元，导致实际渠道利润高于报备",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-05-22",
+    "collected_by": "调查员A、调查员B",
+    "source": "李某第三轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-004": {
+    "id": "EV-004",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于客户A与渠道商乙合作项目",
+    "body": "",
+    "assertion": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于客户A与渠道商乙合作项目",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-05-22",
+    "collected_by": "调查员A、调查员B",
+    "source": "李某第三轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-005": {
+    "id": "EV-005",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认\"这个项目按公司制度来看是假单\"，需求实际来自渠道商乙而非客户A",
+    "body": "",
+    "assertion": "李某承认\"这个项目按公司制度来看是假单\"，需求实际来自渠道商乙而非客户A",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-05-22",
+    "collected_by": "调查员A、调查员B",
+    "source": "李某第三轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-006": {
+    "id": "EV-006",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+    "body": "",
+    "assertion": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-04-16",
+    "collected_by": "调查员A、调查员D",
+    "source": "李某第二轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-007": {
+    "id": "EV-007",
+    "type": "EV",
+    "status": "ready",
+    "title": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+    "body": "",
+    "assertion": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-04-16",
+    "collected_by": "调查员A、调查员D",
+    "source": "李某第二轮访谈笔录",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "EV-013": {
+    "id": "EV-013",
+    "type": "EV",
+    "status": "ready",
+    "title": "渠道商乙（广州）确认120片网卡已转售给B公司，完整货物流向为：终端甲490片+终端乙230片+B公司120片；渠道商乙拒绝提供与B公司的合同、发票、签收单（保密协议为由）",
+    "body": "",
+    "assertion": "渠道商乙（广州）确认110片网卡已转售给B公司，完整货物流向为：终端甲510片+终端乙250片+B公司120片；渠道商乙拒绝提供与B公司的合同、发票、签收单（保密协议为由）",
+    "intent": "",
+    "sources": [],
+    "confidence": "confirmed",
+    "evidence_type": "testimonial",
+    "collected_at": "2026-06-11",
+    "collected_by": "",
+    "source": "渠道商乙公司反馈（联络人A）",
+    "generated_by": "",
+    "reviewed_by": ""
+  },
+  "FND-001": {
+    "id": "FND-001",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某虚构项目名称申报假单",
+    "body": "# 结论：李某虚构项目名称申报假单\n\n## 结论陈述\n\n李某虚构项目名称\"客户A智算中心服务器配件扩容项目\"，以虚假项目名义报单，实际不存在扩容事实，需求实际来自渠道商乙而非客户A。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-001 ← ARG-001 ← LS-001 ← EV-001（名称虚构承认）\n                           ← EV-005（假单性质承认）\n```\n\n### 关键证据摘要\n| 证据ID | 类型 | 核心内容 |\n|--------|------|----------|\n| EV-001 | 供述 | 承认\"扩容\"名称虚构 |\n| EV-005 | 供述 | 承认项目为假单 |\n\n## 违规性质\n\n- **违规类型**：假终端客户（fake_end_customer）\n- **主观故意**：明确承认，无合理辩解\n- **后果**：误导审批流程，损害公司利益\n\n## 建议处理措施\n\n1. 依据公司制度启动违规处理程序\n2. 追回相关违规利益\n3. 考虑解除劳动合同",
+    "assertion": "李某虚构项目名称申报假单",
+    "intent": "正式认定李某虚构项目名称、以虚假项目名义报单的违规行为",
+    "sources": [
+      {
+        "id": "ARG-001",
+        "excerpt": "项目虚构的逻辑论证：李某承认项目名称虚构，需求来自渠道商乙",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "fake_end_customer",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "FND-002": {
+    "id": "FND-002",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某隐瞒渠道链路",
+    "body": "# 结论：李某隐瞒渠道链路\n\n## 结论陈述\n\n李某隐瞒渠道链路，实际渠道为\"总代→渠道商甲→渠道商乙→下游客户\"，报备链路为\"总代→渠道商甲→客户A\"，违反公司渠道报备制度。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-002 ← ARG-002 ← LS-002 ← EV-002（承认隐瞒渠道）\n                           ← EV-005（确认真实需求来源）\n```\n\n### 链路对比\n| 类型 | 链路 |\n|------|------|\n| 报备 | 总代 → 渠道商甲 → 客户A |\n| 实际 | 总代 → 渠道商甲 → 渠道商乙 → 下游 |\n\n## 违规性质\n\n- **违规类型**：隐瞒渠道链路（undisclosed_channel_layer）\n- **主观故意**：明确承认，辩解为\"弥补损失\"\n\n## 建议处理措施\n\n1. 依据渠道管理规定处理\n2. 要求补充完整渠道信息\n3. 加强渠道合规培训",
+    "assertion": "李某隐瞒渠道链路",
+    "intent": "正式认定李某隐瞒真实渠道链路、违反渠道报备制度的违规行为",
+    "sources": [
+      {
+        "id": "ARG-002",
+        "excerpt": "渠道链路隐瞒的逻辑论证：报备链路与真实链路存在差异",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "undisclosed_channel_layer",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "FND-003": {
+    "id": "FND-003",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某瞒报渠道利润",
+    "body": "# 结论：李某瞒报渠道利润\n\n## 结论陈述\n\n李某瞒报渠道利润，报备利润2.6%（285,000元），实际利润3.8%（357,000元），通过与渠道商乙私下沟通压低报备成本实现。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-003 ← LS-003 ← EV-003（承认多杀价操作）\n```\n\n### 利润对比\n| 指标 | 报备 | 实际 | 差异 |\n|------|------|------|------|\n| 利润率 | 2.4% | 3.9% | +1.2% |\n| 利润额 | 261,000元 | 376,000元 | +133,000元 |\n\n## 违规性质\n\n- **违规类型**：隐瞒渠道利润（undisclosed_channel_profit）\n- **主观故意**：主动操作，辩解为\"算错\"\n\n## 建议处理措施\n\n1. 追缴违规所得\n2. 加强成本审核机制\n3. 建立利润真实性验证流程",
+    "assertion": "李某瞒报渠道利润",
+    "intent": "正式认定李某瞒报渠道利润、虚报成本的违规行为",
+    "sources": [
+      {
+        "id": "LS-003",
+        "excerpt": "李某承认与渠道商乙沟通多杀价100元/片，导致实际利润高于报备",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "undisclosed_channel_profit",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "FND-004": {
+    "id": "FND-004",
+    "type": "FND",
+    "status": "draft",
+    "title": "李某协调虚假稽核",
+    "body": "# 结论：李某协调虚假稽核\n\n## 结论陈述\n\n李某协调客户A产品负责人配合人A配合虚假稽核，要求其谎称网卡用于客户A与渠道商乙合作项目，掩盖设备实际流向不符的事实。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-004 ← ARG-004 ← LS-004 ← EV-004（承认协调虚假稽核）\n```\n\n### 参与方\n| 角色 | 人员 | 行为 |\n|------|------|------|\n| 策划者 | 李某 | 提议并协调虚假稽核 |\n| 配合者 | 配合人A | 同意配合虚假陈述 |\n\n## 违规性质\n\n- **违规类型**：假终端客户（fake_end_customer）\n- **严重程度**：高（指导伪造证据）\n\n## 状态说明\n\n本结论目前为\"草稿\"状态，等待ARG-004完成配合人A访谈确认后升级为ready。\n\n## 建议处理措施\n\n1. 待ARG-004确认后启动处理程序\n2. 考虑对配合人A同步调查\n3. 完善稽核验证机制",
+    "assertion": "李某协调虚假稽核",
+    "intent": "正式认定李某协调客户A配合人A配合虚假稽核的违规行为",
+    "sources": [
+      {
+        "id": "ARG-004",
+        "excerpt": "虚假稽核协调的逻辑论证：李某承认协调配合人A配合虚假陈述",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "fake_end_customer",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "FND-005": {
+    "id": "FND-005",
+    "type": "FND",
+    "status": "ready",
+    "title": "设备实际流向与申报不符",
+    "body": "# 结论：设备实际流向与申报不符\n\n## 结论陈述\n\n设备实际流向与申报不符，申报客户为客户A，实际流向渠道商乙及其下游客户（终端甲520片、终端乙250片、B公司130片），构成渠道窜货。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-005 ← ARG-003 ← LS-005 ← EV-006（安装地点某市甲）\n                            ← EV-007（真实需求来自渠道商乙下游）\n                            ← EV-013（渠道商乙确认转售B公司）\n```\n\n### 流向对比\n| 申报 | 实际 |\n|------|------|\n| 客户A（700片） | 终端甲（600片）、终端乙（260片）、B公司（120片） |\n| 用途：智算中心扩容 | 用途：互联网厂商使用 |\n\n## 违规性质\n\n- **违规类型**：渠道窜货（channel_diversion）\n- **主观故意**：李某承认设备实际流向\n\n## 建议处理措施\n\n1. 依据渠道窜货规定处理\n2. 追溯历史类似项目\n3. 加强设备流向追踪机制",
+    "assertion": "设备实际流向与申报不符",
+    "intent": "正式认定设备实际流向与申报客户不符、构成渠道窜货的违规行为",
+    "sources": [
+      {
+        "id": "ARG-003",
+        "excerpt": "渠道窜货的逻辑论证：设备流向终端甲、终端乙、B公司，与申报的客户A不符",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "channel_diversion",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "FND-006": {
+    "id": "FND-006",
+    "type": "FND",
+    "status": "ready",
+    "title": "渠道商乙隐瞒货物流向并获取二次差价",
+    "body": "# 结论：渠道商乙隐瞒货物流向并获取二次差价\n\n## 结论陈述\n\n渠道商乙（广州）声称的110片自用网卡实际转售给B公司，渠道商乙隐瞒了完整货物流向并获取二次差价利润。\n\n## 证据支撑\n\n### 核心证据链\n```\nFND-006 ← LS-005 ← EV-013（渠道商乙确认转售B公司）\n```\n\n### 关键事实\n- 渠道商乙对外声称130片网卡自用\n- 实际已转售给B公司\n- 拒绝提供与B公司的合同、发票、签收单（以保密协议为由）\n\n## 违规性质\n\n- **违规类型**：隐瞒渠道链路、隐瞒渠道利润\n- **严重程度**：中高\n\n## 建议处理措施\n\n1. 要求渠道商乙提供完整交易文件\n2. 重新评估与渠道商乙的合作关系\n3. 加强对渠道转售行为的监控",
+    "assertion": "渠道商乙隐瞒货物流向并获取二次差价",
+    "intent": "正式认定渠道商乙隐瞒完整货物流向、获取二次差价利润的违规行为",
+    "sources": [
+      {
+        "id": "LS-005",
+        "excerpt": "渠道商乙确认120片网卡已转售给B公司，拒绝提供相关合同文件",
+        "form": "text"
+      }
+    ],
+    "confidence": null,
+    "fraud_type": "undisclosed_channel_layer, undisclosed_channel_profit",
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "entity_type": null,
+    "role": null,
+    "_w": 3,
+    "source": ""
+  },
+  "ARG-001": {
+    "id": "ARG-001",
+    "type": "ARG",
+    "status": "ready",
+    "title": "项目虚构的逻辑论证",
+    "body": "# 项目虚构的逻辑论证\n\n## 论证命题\n\n李某虚构项目名称\"客户A智算中心服务器配件扩容项目\"，以虚假项目名义报单，构成假单申报。\n\n## 论证逻辑\n\n### 前提1：项目名称虚假\n- EV-001：李某承认\"扩容\"是虚构的，正常名称应为\"甲企业网络设备采购\"\n- 虚构项目名称的目的是误导审批流程\n\n### 前提2：需求来源虚假\n- EV-005：李某承认需求实际来自渠道商乙而非客户A\n- 客户A仅为名义客户，不具备真实需求\n\n### 前提3：主观认知明确\n- EV-005：李某承认\"这个项目按公司制度来看是假单\"\n- 表明其完全清楚行为的违规性质\n\n## 结论\n\n综合以上证据，李某虚构项目名称、隐瞒真实需求来源的行为已构成虚假申报，主观故意明显。",
+    "assertion": "项目虚构的逻辑论证",
+    "intent": "通过证据证明李某虚构项目名称、虚假申报的事实构成",
+    "sources": [
+      {
+        "id": "LS-001",
+        "excerpt": "李某承认项目名称虚构，需求实际来自渠道商乙",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员A",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 2
+  },
+  "ARG-002": {
+    "id": "ARG-002",
+    "type": "ARG",
+    "status": "ready",
+    "title": "渠道链路隐瞒的逻辑论证",
+    "body": "# 渠道链路隐瞒的逻辑论证\n\n## 论证命题\n\n李某隐瞒真实渠道链路，报备链路与实际链路存在重大差异，违反公司渠道报备制度。\n\n## 论证逻辑\n\n### 报备链路\n```\n总代 → 渠道商甲 → 客户A（申报）\n```\n\n### 真实链路\n```\n总代 → 渠道商甲 → 渠道商乙 → 下游客户（实际）\n```\n\n### 证据支撑\n1. **EV-002**：李某承认隐瞒了渠道商甲到渠道商乙的渠道层级\n2. **EV-005**：确认需求来自渠道商乙，客户A仅为名义客户\n\n### 隐瞒的后果\n- 公司无法掌握真实渠道结构\n- 渠道利润核算失真\n- 可能导致渠道政策执行偏差\n\n## 结论\n\n李某的行为构成\"隐瞒渠道链路\"违规，主观故意明确，已违反公司渠道管理制度。",
+    "assertion": "渠道链路隐瞒的逻辑论证",
+    "intent": "通过证据证明李某隐瞒渠道层级、违反渠道报备制度的事实",
+    "sources": [
+      {
+        "id": "LS-002",
+        "excerpt": "李某承认隐瞒渠道商甲到渠道商乙的渠道链路，报备链路与真实链路不符",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员C",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 2
+  },
+  "ARG-003": {
+    "id": "ARG-003",
+    "type": "ARG",
+    "status": "ready",
+    "title": "渠道窜货的逻辑论证",
+    "body": "# 渠道窜货的逻辑论证\n\n## 论证命题\n\n李某主导的PRJ-XXX项目中，设备实际流向与申报客户严重不符，构成渠道窜货违规。\n\n## 论证逻辑\n\n### 申报流向\n- 申报客户：客户A（710片）\n- 申报用途：客户A智算中心服务器配件扩容\n\n### 实际流向\n- 终端甲：500片\n- 终端乙：270片\n- B公司：120片\n- 安装地点：某市甲（互联网X数据中心）\n\n### 证据支撑\n1. **EV-006**：李某承认设备安装地点为某市甲，最终提供给互联网X\n2. **EV-007**：李某承认真实需求来自渠道商乙及其下游互联网客户\n3. **EV-013**：渠道商乙确认130片网卡转售给B公司\n\n## 窜货特征\n- 跨区域流转：从申报的广东流向内蒙古\n- 客户不符：从客户A流向终端甲、终端乙、B公司\n- 用途不符：从\"客户A智算中心扩容\"变为互联网厂商使用\n\n## 结论\n\n设备实际流向与申报严重不符，构成\"渠道窜货\"违规。",
+    "assertion": "渠道窜货的逻辑论证",
+    "intent": "通过证据证明设备实际流向与申报不符，构成渠道窜货",
+    "sources": [
+      {
+        "id": "LS-005",
+        "excerpt": "设备实际流向终端甲、终端乙、B公司，与申报的客户A不符",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员D",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 2
+  },
+  "ARG-004": {
+    "id": "ARG-004",
+    "type": "ARG",
+    "status": "draft",
+    "title": "虚假稽核协调的逻辑论证",
+    "body": "# 虚假稽核协调的逻辑论证\n\n## 论证命题\n\n李某协调客户A配合人A配合虚假稽核，构成指导伪造证据的严重违规。\n\n## 论证逻辑\n\n### 协调过程\n1. **提议**：李某主动联系配合人A\n2. **要求**：要求配合人A谎称网卡用于\"客户A与渠道商乙合作项目\"\n3. **目的**：掩盖设备实际流向不符的事实\n\n### 参与方责任\n| 角色 | 人员 | 责任 |\n|------|------|------|\n| 策划者 | 李某 | 主导虚假稽核，主观恶意明显 |\n| 配合者 | 配合人A | 协助虚假陈述，共同违规 |\n\n### 证据支撑\n- **EV-004**：李某承认协调虚假稽核的事实\n\n## 结论\n\n李某的行为构成\"指导伪造证据\"，属于严重违规行为，主观恶意明显。\n\n**状态说明**：本论据待配合人A访谈确认后升级为ready。",
+    "assertion": "虚假稽核协调的逻辑论证",
+    "intent": "通过证据证明李某协调客户A配合人A配合虚假稽核的行为",
+    "sources": [
+      {
+        "id": "LS-004",
+        "excerpt": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于合作项目",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 2
+  },
+  "LS-001": {
+    "id": "LS-001",
+    "type": "LS",
+    "status": "ready",
+    "title": "项目名称虚构确认",
+    "body": "# 项目名称虚构确认\n\n## 核心事实提取\n\n根据李某第三轮访谈笔录（EV-001、EV-005）：\n\n1. **项目名称虚构**：李某承认申报的项目名称\"客户A智算中心服务器配件扩容项目\"是虚构的，实际应为\"甲企业网络设备采购\"\n2. **需求来源虚假**：项目需求实际来自渠道商乙而非客户A\n3. **主观认知**：李某明确承认\"这个项目按公司制度来看是假单\"\n\n## 证据链\n\nEV-001（承认名称虚构）+ EV-005（承认假单性质）→ 项目虚构事实确认",
+    "assertion": "项目名称虚构确认",
+    "intent": "提取李某关于项目名称虚构的供述，确认\\\"扩容\\\"项目为虚假申报",
+    "sources": [
+      {
+        "id": "EV-001",
+        "excerpt": "李某承认项目名称\\\"扩容\\\"是虚构的，正常项目名称应为\\\"甲企业网络设备采购\\\"",
+        "form": "text"
+      },
+      {
+        "id": "EV-005",
+        "excerpt": "李某承认\\\"这个项目按公司制度来看是假单\\\"，需求实际来自渠道商乙而非客户A",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员A",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 1
+  },
+  "LS-002": {
+    "id": "LS-002",
+    "type": "LS",
+    "status": "ready",
+    "title": "渠道链路隐瞒证据",
+    "body": "# 渠道链路隐瞒证据\n\n## 报备链路 vs 真实链路\n\n**报备链路**（系统申报）：\n```\n总代 → 渠道商甲 → 客户A（最终客户）\n```\n\n**真实链路**（实际情况）：\n```\n总代 → 渠道商甲 → 渠道商乙 → 下游客户（终端甲、终端乙、B公司）\n```\n\n## 关键供述\n\n1. EV-002（第一轮访谈）：李某承认隐瞒了渠道商甲到渠道商乙的渠道层级\n2. EV-005（第三轮访谈）：确认需求实际来自渠道商乙，客户A仅为名义客户\n\n## 隐瞒性质\n\n此隐瞒构成\"隐瞒渠道链路\"违规，违反公司渠道报备制度。",
+    "assertion": "渠道链路隐瞒证据",
+    "intent": "提取李某关于隐瞒渠道链路的供述，确认真实渠道与报备渠道存在差异",
+    "sources": [
+      {
+        "id": "EV-002",
+        "excerpt": "李某承认隐瞒了渠道商甲到下游渠道商乙的渠道链路",
+        "form": "text"
+      },
+      {
+        "id": "EV-005",
+        "excerpt": "李某承认需求实际来自渠道商乙而非客户A",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员C",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 1
+  },
+  "LS-003": {
+    "id": "LS-003",
+    "type": "LS",
+    "status": "ready",
+    "title": "渠道利润瞒报证据",
+    "body": "# 渠道利润瞒报证据\n\n## 利润差异对比\n\n| 指标 | 报备值 | 实际值 | 差异 |\n|------|--------|--------|------|\n| 利润率 | 2.5% | 4.1% | +1.3% |\n| 利润额 | 287,000元 | 439,000元 | +114,000元 |\n\n## 操作手法\n\n李某与渠道商乙私下沟通，通过\"帮渠道商甲多杀价100元/片\"的方式，降低了报备的采购成本，从而压低了报备利润。实际交易中，渠道商乙获得了额外的差价利润。\n\n## 主观意图\n\n李某对此予以承认，辩解为\"算错\"，但操作手法显示存在明显的主观故意。",
+    "assertion": "渠道利润瞒报证据",
+    "intent": "提取李某关于瞒报渠道利润的供述，确认实际利润与报备利润存在差异",
+    "sources": [
+      {
+        "id": "EV-003",
+        "excerpt": "李某承认后期与渠道商乙沟通，每片网卡帮渠道商甲多杀价100元，导致实际渠道利润高于报备",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员B",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 1
+  },
+  "LS-004": {
+    "id": "LS-004",
+    "type": "LS",
+    "status": "ready",
+    "title": "虚假稽核协调证据",
+    "body": "# 虚假稽核协调证据\n\n## 协调过程\n\n李某主动联系客户A产品负责人配合人A（SUB-002），要求其在稽核调查中作虚假陈述：\n- 谎称840片网卡用于\"客户A与渠道商乙合作项目\"\n- 隐瞒设备实际流向渠道商乙及其下游客户的事实\n\n## 参与方\n\n| 角色 | 人员 | 行为 |\n|------|------|------|\n| 策划者 | 李某（SUB-001） | 提议并协调虚假稽核 |\n| 配合者 | 配合人A（SUB-002） | 同意配合虚假陈述 |\n\n## 违规性质\n\n此行为构成\"指导伪造证据\"，属于严重违规，主观恶意明显。",
+    "assertion": "虚假稽核协调证据",
+    "intent": "提取李某关于协调虚假稽核的供述，确认其主导了客户A配合虚假陈述的行为",
+    "sources": [
+      {
+        "id": "EV-004",
+        "excerpt": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于客户A与渠道商乙合作项目",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员A",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 1
+  },
+  "LS-005": {
+    "id": "LS-005",
+    "type": "LS",
+    "status": "ready",
+    "title": "设备流向不符证据",
+    "body": "# 设备流向不符证据\n\n## 申报流向 vs 实际流向\n\n**申报流向**：\n```\n总代 → 渠道商甲 → 客户A（800片）\n```\n\n**实际流向**：\n```\n总代 → 渠道商甲 → 渠道商乙 → 终端甲（620片）\n                   → 终端乙（240片）\n                   → B公司（120片）\n```\n\n## 关键证据\n\n1. **EV-006**：李某承认设备安装地点为某市甲（互联网X数据中心所在地）\n2. **EV-007**：李某承认真实需求来自渠道商乙及其下游互联网客户\n3. **EV-013**：渠道商乙确认130片网卡转售给B公司，拒绝提供相关合同文件\n\n## 窜货性质\n\n设备实际流向与申报不符，构成\"渠道窜货\"违规。",
+    "assertion": "设备流向不符证据",
+    "intent": "提取设备实际流向的证据，确认申报客户与实际客户存在差异",
+    "sources": [
+      {
+        "id": "EV-006",
+        "excerpt": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+        "form": "text"
+      },
+      {
+        "id": "EV-007",
+        "excerpt": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+        "form": "text"
+      },
+      {
+        "id": "EV-013",
+        "excerpt": "渠道商乙（广州）确认120片网卡已转售给B公司，完整货物流向为：终端甲610片+终端乙250片+B公司130片",
+        "form": "text"
+      }
+    ],
+    "generated_by": "ai",
+    "reviewed_by": "调查员D",
+    "confidence": null,
+    "entity_type": null,
+    "role": null,
+    "_w": 1
+  }
+};
+
+const EDGES_DATA = [
+  {
+    "from": "ARG-001",
+    "to": "FND-001",
+    "excerpt": "项目虚构的逻辑论证：李某承认项目名称虚构，需求来自渠道商乙",
+    "form": "text"
+  },
+  {
+    "from": "ARG-002",
+    "to": "FND-002",
+    "excerpt": "渠道链路隐瞒的逻辑论证：报备链路与真实链路存在差异",
+    "form": "text"
+  },
+  {
+    "from": "LS-003",
+    "to": "FND-003",
+    "excerpt": "李某承认与渠道商乙沟通多杀价110元/片，导致实际利润高于报备",
+    "form": "text"
+  },
+  {
+    "from": "ARG-004",
+    "to": "FND-004",
+    "excerpt": "虚假稽核协调的逻辑论证：李某承认协调配合人A配合虚假陈述",
+    "form": "text"
+  },
+  {
+    "from": "ARG-003",
+    "to": "FND-005",
+    "excerpt": "渠道窜货的逻辑论证：设备流向终端甲、终端乙、B公司，与申报的客户A不符",
+    "form": "text"
+  },
+  {
+    "from": "LS-005",
+    "to": "FND-006",
+    "excerpt": "渠道商乙确认110片网卡已转售给B公司，拒绝提供相关合同文件",
+    "form": "text"
+  },
+  {
+    "from": "LS-001",
+    "to": "ARG-001",
+    "excerpt": "李某承认项目名称虚构，需求实际来自渠道商乙",
+    "form": "text"
+  },
+  {
+    "from": "LS-002",
+    "to": "ARG-002",
+    "excerpt": "李某承认隐瞒渠道商甲到渠道商乙的渠道链路，报备链路与真实链路不符",
+    "form": "text"
+  },
+  {
+    "from": "LS-005",
+    "to": "ARG-003",
+    "excerpt": "设备实际流向终端甲、终端乙、B公司，与申报的客户A不符",
+    "form": "text"
+  },
+  {
+    "from": "LS-004",
+    "to": "ARG-004",
+    "excerpt": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于合作项目",
+    "form": "text"
+  },
+  {
+    "from": "EV-001",
+    "to": "LS-001",
+    "excerpt": "李某承认项目名称\\\"扩容\\\"是虚构的，正常项目名称应为\\\"甲企业网络设备采购\\\"",
+    "form": "text"
+  },
+  {
+    "from": "EV-005",
+    "to": "LS-001",
+    "excerpt": "李某承认\\\"这个项目按公司制度来看是假单\\\"，需求实际来自渠道商乙而非客户A",
+    "form": "text"
+  },
+  {
+    "from": "EV-002",
+    "to": "LS-002",
+    "excerpt": "李某承认隐瞒了渠道商甲到下游渠道商乙的渠道链路",
+    "form": "text"
+  },
+  {
+    "from": "EV-005",
+    "to": "LS-002",
+    "excerpt": "李某承认需求实际来自渠道商乙而非客户A",
+    "form": "text"
+  },
+  {
+    "from": "EV-003",
+    "to": "LS-003",
+    "excerpt": "李某承认后期与渠道商乙沟通，每片网卡帮渠道商甲多杀价100元，导致实际渠道利润高于报备",
+    "form": "text"
+  },
+  {
+    "from": "EV-004",
+    "to": "LS-004",
+    "excerpt": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于客户A与渠道商乙合作项目",
+    "form": "text"
+  },
+  {
+    "from": "EV-006",
+    "to": "LS-005",
+    "excerpt": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+    "form": "text"
+  },
+  {
+    "from": "EV-007",
+    "to": "LS-005",
+    "excerpt": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+    "form": "text"
+  },
+  {
+    "from": "EV-013",
+    "to": "LS-005",
+    "excerpt": "渠道商乙（广州）确认110片网卡已转售给B公司，完整货物流向为：终端甲530片+终端乙220片+B公司110片",
+    "form": "text"
+  }
+];
+
+const CHAINS_DATA = [
+  {
+    "id": "FND-001",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某虚构项目名称申报假单",
+    "children": [
+      {
+        "id": "ARG-001",
+        "type": "ARG",
+        "status": "ready",
+        "title": "项目虚构的逻辑论证",
+        "children": [
+          {
+            "id": "LS-001",
+            "type": "LS",
+            "status": "ready",
+            "title": "项目名称虚构确认",
+            "children": [
+              {
+                "id": "EV-001",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认项目名称\"扩容\"是虚构的，正常项目名称应为\"甲企业网络设备采购\"",
+                "children": []
+              },
+              {
+                "id": "EV-005",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认\"这个项目按公司制度来看是假单\"，需求实际来自渠道商乙而非客户A",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "FND-002",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某隐瞒渠道链路",
+    "children": [
+      {
+        "id": "ARG-002",
+        "type": "ARG",
+        "status": "ready",
+        "title": "渠道链路隐瞒的逻辑论证",
+        "children": [
+          {
+            "id": "LS-002",
+            "type": "LS",
+            "status": "ready",
+            "title": "渠道链路隐瞒证据",
+            "children": [
+              {
+                "id": "EV-002",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认隐瞒了渠道商甲到下游渠道商乙的渠道链路",
+                "children": []
+              },
+              {
+                "id": "EV-005",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认\"这个项目按公司制度来看是假单\"，需求实际来自渠道商乙而非客户A",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "FND-003",
+    "type": "FND",
+    "status": "ready",
+    "title": "李某瞒报渠道利润",
+    "children": [
+      {
+        "id": "LS-003",
+        "type": "LS",
+        "status": "ready",
+        "title": "渠道利润瞒报证据",
+        "children": [
+          {
+            "id": "EV-003",
+            "type": "EV",
+            "status": "ready",
+            "title": "李某承认后期与渠道商乙沟通，每片网卡帮渠道商甲多杀价100元，导致实际渠道利润高于报备",
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "FND-004",
+    "type": "FND",
+    "status": "draft",
+    "title": "李某协调虚假稽核",
+    "children": [
+      {
+        "id": "ARG-004",
+        "type": "ARG",
+        "status": "draft",
+        "title": "虚假稽核协调的逻辑论证",
+        "children": [
+          {
+            "id": "LS-004",
+            "type": "LS",
+            "status": "ready",
+            "title": "虚假稽核协调证据",
+            "children": [
+              {
+                "id": "EV-004",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认协调客户A配合人A配合虚假稽核，谎称网卡用于客户A与渠道商乙合作项目",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "FND-005",
+    "type": "FND",
+    "status": "ready",
+    "title": "设备实际流向与申报不符",
+    "children": [
+      {
+        "id": "ARG-003",
+        "type": "ARG",
+        "status": "ready",
+        "title": "渠道窜货的逻辑论证",
+        "children": [
+          {
+            "id": "LS-005",
+            "type": "LS",
+            "status": "ready",
+            "title": "设备流向不符证据",
+            "children": [
+              {
+                "id": "EV-006",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+                "children": []
+              },
+              {
+                "id": "EV-007",
+                "type": "EV",
+                "status": "ready",
+                "title": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+                "children": []
+              },
+              {
+                "id": "EV-013",
+                "type": "EV",
+                "status": "ready",
+                "title": "渠道商乙（广州）确认110片网卡已转售给B公司，完整货物流向为：终端甲520片+终端乙250片+B公司120片；渠道商乙拒绝提供与B公司的合同、发票、签收单（保密协议为由）",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "FND-006",
+    "type": "FND",
+    "status": "ready",
+    "title": "渠道商乙隐瞒货物流向并获取二次差价",
+    "children": [
+      {
+        "id": "LS-005",
+        "type": "LS",
+        "status": "ready",
+        "title": "设备流向不符证据",
+        "children": [
+          {
+            "id": "EV-006",
+            "type": "EV",
+            "status": "ready",
+            "title": "李某承认设备安装地点为某市甲，最终提供给互联网X",
+            "children": []
+          },
+          {
+            "id": "EV-007",
+            "type": "EV",
+            "status": "ready",
+            "title": "李某承认客户A本身无需求，真实需求来自渠道商乙及其下游客户（互联网Y、互联网Z、互联网W、互联网X、互联网V）",
+            "children": []
+          },
+          {
+            "id": "EV-013",
+            "type": "EV",
+            "status": "ready",
+            "title": "渠道商乙（广州）确认120片网卡已转售给B公司，完整货物流向为：终端甲510片+终端乙230片+B公司130片；渠道商乙拒绝提供与B公司的合同、发票、签收单（保密协议为由）",
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+];
+
+// INJECTION_END_MARKER
+
+// ═══════════════════════════════════════════════════════════════
+// 配置
+// ═══════════════════════════════════════════════════════════════
+const TYPE_COLORS = {
+  EV:{fill:'#7a9bb5',bg:'rgba(122,155,181,.2)',border:'#8ab0cc'},
+  LS:{fill:'#4ecdc4',bg:'rgba(78,205,196,.2)',border:'#6aded0'},
+  ARG:{fill:'#9b7ae8',bg:'rgba(155,122,232,.2)',border:'#b094ee'},
+  FND:{fill:'#e8a020',bg:'rgba(232,160,32,.2)',border:'#f0b840'},
+  ENT:{fill:'#5a8aaa',bg:'rgba(90,138,170,.2)',border:'#7aa0b8'},
+  HYP:{fill:'#c89050',bg:'rgba(200,144,80,.2)',border:'#d4a868'},
+  EVT:{fill:'#7aaa5a',bg:'rgba(122,170,90,.2)',border:'#90c070'},
+};
+const STATUS_LABELS={ready:'就绪',draft:'草稿',superseded:'已取代'};
+const TYPE_LABELS={EV:'原始证据',LS:'线索',ARG:'论据',FND:'结论',ENT:'实体',HYP:'假设',EVT:'事件'};
+const $=id=>document.getElementById(id);
+function typeColor(t){return TYPE_COLORS[t]||{fill:'#666',bg:'rgba(100,100,100,.2)',border:'#888'}}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&#34;')}
+
+// ═══════════════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════════════
+$('case-badge').textContent=CASE_DATA.id;
+$('case-title').textContent=CASE_DATA.title;
+$('case-subtitle').textContent=CASE_DATA.subtitle;
+let st='';
+for(const[k,v]of Object.entries(CASE_DATA.stats.statuses))if(v>0)st+=`<span><span class="stat-dot dot-${k}"></span>${v}</span>`;
+st+=`<span style="color:var(--text-dim)">| ${CASE_DATA.stats.total} 节点</span>`;
+$('stats-bar').innerHTML=st;
+
+// ═══════════════════════════════════════════════════════════════
+// 折叠状态 + Markdown 渲染
+// ═══════════════════════════════════════════════════════════════
+const collapsedNodes=new Set();
+
+function toggleAllCollapse(){
+  const hasCollapsed=collapsedNodes.size>0;
+  collapsedNodes.clear();
+  if(!hasCollapsed){
+    function collectIds(chain){
+      if(chain.children&&chain.children.length>0){
+        collapsedNodes.add(chain.id);
+        chain.children.forEach(collectIds)
+      }
+    }
+    CHAINS_DATA.forEach(collectIds)
+  }
+  document.getElementById('btn-collapse-all').textContent=hasCollapsed?'⊟ 全部':'⊞ 全部';
+  renderXMind()
+}
+
+function mdToHtml(t){
+  if(!t)return'';
+  let h=esc(t);
+
+  // 1. 保护代码块（先提取，避免被后续规则污染）
+  const blocks=[];
+  h=h.replace(/```(\w*)\n?([\s\S]*?)```/g,(m,lang,code)=>{
+    const idx=blocks.length;
+    blocks.push('<pre><code>'+esc(code.replace(/^<br>/,'').trim())+'</code></pre>');
+    return '```CODE_BLOCK_'+idx+'```'
+  });
+
+  // 2. 表格（| col | col | 格式）
+  h=h.replace(/^\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)+)/gm,(m,header,body)=>{
+    let tbl='<table style="border-collapse:collapse;width:100%;margin:6px 0">';
+    tbl+='<thead><tr>';
+    header.split('|').forEach(c=>{const s=c.trim();if(s)tbl+='<th style="border:1px solid var(--border);padding:3px 6px;text-align:left;font-size:12px">'+s+'</th>'});
+    tbl+='</tr></thead><tbody>';
+    body.split('\n').forEach(row=>{
+      const cells=row.split('|').filter(Boolean);
+      if(cells.length>1){
+        tbl+='<tr>';
+        cells.forEach(c=>{const s=c.trim();if(s)tbl+='<td style="border:1px solid var(--border);padding:3px 6px;font-size:12px;color:var(--text-secondary)">'+s+'</td>'});
+        tbl+='</tr>'
+      }
+    });
+    tbl+='</tbody></table>';
+    return tbl
+  });
+
+  // 3. 标题
+  h=h.replace(/^#### (.+)$/gm,'<h4>$1</h4>');
+  h=h.replace(/^### (.+)$/gm,'<h3>$1</h3>');
+  h=h.replace(/^## (.+)$/gm,'<h3>$1</h3>');
+  h=h.replace(/^# (.+)$/gm,'<h2>$1</h2>');
+
+  // 4. 行内格式
+  h=h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  h=h.replace(/\*(.+?)\*/g,'<em>$1</em>');
+  h=h.replace(/`([^`]+)`/g,'<code>$1</code>');
+  h=h.replace(/\[(.+?)\]\((.+?)\)/g,'<a href="$2" target="_blank" style="color:var(--teal)">$1</a>');
+
+  // 5. 列表
+  h=h.replace(/^- (.+)$/gm,'<li>$1</li>');
+  h=h.replace(/^(\d+)\. (.+)$/gm,'<li>$2</li>');
+  h=h.replace(/((?:<li>.*<\/li>\n?)+)/g,'<ul>$1</ul>');
+
+  // 6. 分割线
+  h=h.replace(/---+/g,'<hr style="border-color:var(--border);margin:8px 0">');
+
+  // 7. 段落包装（跳过已经是块级的内容）
+  const blockTags='h[2-4]|pre|table|ul|hr';
+  const parts=h.split(/\n\n+/);
+  if(parts.length>1){
+    h=parts.map(p=>{
+      const t=p.trim();
+      if(!t)return'';
+      if(new RegExp('^<('+blockTags+')').test(t))return t;
+      return'<p>'+t.replace(/\n/g,'<br>')+'</p>'
+    }).join('')
+  }else{
+    const t=h.trim();
+    if(!new RegExp('^<('+blockTags+')').test(t))
+      h='<p>'+t.replace(/\n/g,'<br>')+'</p>'
+  }
+
+  // 8. 恢复代码块
+  h=h.replace(/```CODE_BLOCK_(\d+)```/g,(m,i)=>blocks[i]||m);
+  return h
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 详情面板
+// ═══════════════════════════════════════════════════════════════
+function showDetailPanel(nid){
+  const n=NODES_DATA[nid];if(!n)return;
+  const panel=$('detail-panel'),pid=$('panel-id'),ptitle=$('panel-title'),pbody=$('panel-body');
+  const cc=typeColor(n.type);
+  pid.style.color=cc.fill;
+  pid.textContent=n.id;
+  ptitle.textContent=n.title;
+
+  let b=`<div class="panel-meta"><div class="panel-meta-item"><div class="panel-meta-label">类型</div><div class="panel-meta-value">${TYPE_LABELS[n.type]||n.type}</div></div>
+<div class="panel-meta-item"><div class="panel-meta-label">状态</div><div class="panel-meta-value"><span class="stat-dot dot-${n.status}"></span>${STATUS_LABELS[n.status]||n.status}</div></div>
+<div class="panel-meta-item"><div class="panel-meta-label">置信度</div><div>${n.confidence||'—'}</div></div>
+<div class="panel-meta-item"><div class="panel-meta-label">生成</div><div>${n.generated_by||'—'}</div></div></div>`;
+
+  if(n.type==='EV'&&(n.evidence_type||n.collected_at||n.collected_by)){
+    b+='<h4>证据信息</h4>';
+    if(n.source)b+=`<p>来源: ${esc(n.source)}</p>`;
+    if(n.collected_at)b+=`<p>收集: ${n.collected_at}</p>`;
+    if(n.collected_by)b+=`<p>收集人: ${n.collected_by}</p>`;
+  }
+
+  if(n.body&&n.body!=='---'&&n.body!=='')b+=mdToHtml(n.body);
+  else if(n.assertion)b+=`<p style="color:var(--teal);font-style:italic">${esc(n.assertion)}</p>`;
+  else b+=`<p style="color:var(--text-dim)">（无详细内容）</p>`;
+
+  if(n.sources&&n.sources.length){
+    b+='<h4>来源节点</h4>';
+    for(const s of n.sources){
+      const sc=NODES_DATA[s.id];const tc=typeColor(sc?sc.type:'EV');
+      b+=`<div class="panel-source" onclick="showDetailPanel('${s.id}')"><span class="panel-source-id" style="color:${tc.fill}">${s.id}</span><span class="panel-source-excerpt">${s.excerpt?esc(s.excerpt):'—'}</span></div>`
+    }
+  }
+
+  const refBy=Object.values(NODES_DATA).filter(x=>x.sources&&x.sources.some(s=>s.id===nid));
+  if(refBy.length){
+    b+='<h4>被引用为来源</h4>';
+    for(const r of refBy){const rc=typeColor(r.type);
+      b+=`<div class="panel-source" onclick="showDetailPanel('${r.id}')"><span class="panel-source-id" style="color:${rc.fill}">${r.id}</span><span class="panel-source-excerpt">${esc(r.title)}</span></div>`
+    }
+  }
+
+  pbody.innerHTML=b;
+  panel.classList.add('open')
+}
+function closeDetailPanel(){$('detail-panel').classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetailPanel()});
+
+// ═══════════════════════════════════════════════════════════════
+// XMind 左→右逻辑图
+// ═══════════════════════════════════════════════════════════════
+const XMIND={slotH:74,colW:[160,180,160,140],gap:48,topPad:24,chainGap:28};
+
+function xCountLeaves(chain){
+  if(collapsedNodes.has(chain.id))return 1;
+  if(!chain.children||!chain.children.length)return 1;
+  return chain.children.reduce((s,c)=>s+xCountLeaves(c),0)
+}
+
+function xLayoutSubtree(chain,startY,level,xPos){
+  const n=NODES_DATA[chain.id];
+  if(!n)return null;
+  const leaves=xCountLeaves(chain);
+  const h=leaves*XMIND.slotH;
+  const w=XMIND.colW[Math.min(level,XMIND.colW.length-1)];
+  const cardH=level===0?60:level===1?56:level===2?56:52;
+  const midY=startY+h/2;
+  const hasChildren=chain.children&&chain.children.length>0;
+  const isCollapsed=collapsedNodes.has(chain.id);
+  const result={id:chain.id,node:n,level,x:xPos,y:midY-cardH/2,w,h:cardH,children:[],subLeaves:leaves,hasChildren,isCollapsed};
+  let childY=startY;
+  if(hasChildren&&!isCollapsed){
+    const childX=xPos+w+XMIND.gap;
+    for(const c of chain.children){
+      const cl=xLayoutSubtree(c,childY,level+1,childX);
+      if(cl){result.children.push(cl);childY+=cl.subLeaves*XMIND.slotH}
+    }
+  }
+  return result
+}
+
+function xBuildLayout(){
+  if(!CHAINS_DATA.length)return[];
+  let y=XMIND.topPad;
+  const roots=[];
+  for(const ch of CHAINS_DATA){
+    const root=xLayoutSubtree(ch,y,0,XMIND.topPad);
+    if(root){roots.push(root);y+=root.subLeaves*XMIND.slotH+XMIND.chainGap}
+  }
+  return roots
+}
+
+function xCollectEdges(layout,edges){
+  for(const c of layout.children){
+    edges.push({x1:layout.x+layout.w,y1:layout.y+layout.h/2,x2:c.x,y2:c.y+c.h/2,from:layout.id,to:c.id});
+    xCollectEdges(c,edges)
+  }
+}
+
+function xDimension(roots){
+  let maxX=0,maxY=0;
+  function walk(n){maxX=Math.max(maxX,n.x+n.w);maxY=Math.max(maxY,n.y+n.h);n.children.forEach(walk)}
+  roots.forEach(walk);
+  return{w:maxX+60,h:maxY+40}
+}
+
+function renderXMind(){
+  const roots=xBuildLayout();
+  const container=$('xmind-content');
+  if(!roots.length){container.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-dim);gap:8px;padding:40px"><div style="font-size:36px;opacity:.4">📋</div><div style="font-size:13px">无证据链数据</div></div>';return}
+
+  const edges=[];
+  roots.forEach(r=>xCollectEdges(r,edges));
+  const dim=xDimension(roots);
+
+  // SVG 连线 + 卡片 — 放在同一层，共享坐标原点
+  let svgHtml='<svg style="position:absolute;top:0;left:0;pointer-events:none" width="'+dim.w+'" height="'+dim.h+'">';
+  for(const e of edges){
+    const mx=(e.x1+e.x2)/2,my=(e.y1+e.y2)/2;
+    svgHtml+=`<path d="M${e.x1},${e.y1} L${mx},${e.y1} L${mx},${e.y2} L${e.x2},${e.y2}" fill="none" stroke="#2a3f56" stroke-width="1.5" stroke-linejoin="round"/>`;
+    const edgeData=EDGES_DATA.find(ed=>ed.from===e.from&&ed.to===e.to);
+    if(edgeData&&edgeData.excerpt){
+      svgHtml+=`<text x="${mx}" y="${my-4}" text-anchor="middle" fill="#4a6880" font-size="9">${esc(edgeData.excerpt.slice(0,18))}</text>`
+    }
+  }
+  svgHtml+='</svg>';
+
+  const cards=[];
+  function collect(n){cards.push(n);n.children.forEach(collect)}
+  roots.forEach(collect);
+
+  const typeLevel=m=>{if(m.level===0)return'xmind-card-l1';if(m.level===1)return'xmind-card-l2';if(m.level===2)return'xmind-card-l3';return'xmind-card-l4'};
+
+  let cardsHtml='';
+  for(const c of cards){
+    const fullTitle=c.node.title||'';
+    cardsHtml+=`<div class="xmind-card ${typeLevel(c)}" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px" data-id="${c.id}" title="${esc(fullTitle)}">
+      <div class="x-top">
+        <span class="x-id">${c.id}</span>
+        <span class="x-dot" style="background:${c.node.status==='ready'?'#52c97a':c.node.status==='draft'?'#e8a020':'#4a6880'}"></span>
+      </div>
+      <span class="x-title">${esc(fullTitle)}</span>
+    </div>`
+  }
+
+  // 折叠按钮（画在连接线起始处）
+  let btnHtml='';
+  function collectBtns(n){
+    if(n.hasChildren){
+      const icon=n.isCollapsed?'+':'−';
+      btnHtml+=`<button class="x-collapse-btn" style="left:${n.x+n.w+4}px;top:${n.y+n.h/2-8}px" data-toggle="${n.id}">${icon}</button>`
+    }
+    n.children.forEach(collectBtns)
+  }
+  roots.forEach(collectBtns);
+
+  container.innerHTML='<div style="position:relative;width:'+dim.w+'px;height:'+dim.h+'px">'+svgHtml+btnHtml+cardsHtml+'</div>';
+  $('btn-collapse-all').textContent=collapsedNodes.size?'⊞ 全部':'⊟ 全部';
+}
+
+// XMind 交互
+$('xmind-content').addEventListener('click',e=>{
+  const btn=e.target.closest('.x-collapse-btn');
+  if(btn){
+    const id=btn.dataset.toggle;
+    if(collapsedNodes.has(id))collapsedNodes.delete(id);else collapsedNodes.add(id);
+    renderXMind();return
+  }
+  const card=e.target.closest('.xmind-card');
+  if(card)showDetailPanel(card.dataset.id)
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Resize
+// ═══════════════════════════════════════════════════════════════
+let rt;
+window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>renderXMind(),200)});
+
+// ═══════════════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════════════
+renderXMind();
+</script>
+</body>
+</html>

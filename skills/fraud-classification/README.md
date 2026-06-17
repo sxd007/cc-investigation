@@ -50,9 +50,13 @@
 
 ## 三、分类框架全景
 
-本技能基于 **ACFE（注册舞弊审查师协会）** 的职业舞弊分类体系，将舞弊分为三大主类和若干子类。
+本技能基于 **ACFE** 的职业舞弊分类体系，将舞弊分为三大主类和若干子类。
 
 ![ACFE 舞弊分类全景](assets/example-acfe-fraud-types.jpg)
+
+<br />
+
+详细内容，可以查看[ACFE舞弊分类树](templates/index.html)
 
 **报告引用格式：** ACFE, "Occupational Fraud 2026: A Report to the Nations" (2026).
 
