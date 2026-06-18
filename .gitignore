@@ -8,5 +8,8 @@ Thumbs.db
 *.swo
 *~
 
+# IDE 项目文件
+.trae/
+
 # 日志
 *.log
