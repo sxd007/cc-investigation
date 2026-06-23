@@ -328,7 +328,7 @@ def load_all_nodes(case_dir: Path) -> list[dict]:
         if not meta:
             continue
 
-        node_id = meta.get("id", "")
+        node_id = meta.get("id", "") or meta.get("node_id", "")
         node_type = meta.get("type", "")
         status = meta.get("status", "draft")
         if not node_id or not node_type:

@@ -13,3 +13,8 @@ Thumbs.db
 
 # 日志
 *.log
+
+# 虚拟环境
+*.egg-info/
+.venv/
+seal_venv/
