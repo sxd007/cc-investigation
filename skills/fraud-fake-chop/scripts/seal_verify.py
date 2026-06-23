@@ -96,7 +96,9 @@ def load_image(file_path: str) -> np.ndarray:
     if p.suffix.lower() == ".pdf":
         print(f"  📄 PDF转图像: {p.name}")
         return pdf_to_image(file_path)
-    img = cv2.imread(file_path)
+    # cv2.imread 在 Windows 上不支持中文路径，改用 imdecode
+    img_array = np.fromfile(file_path, dtype=np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError(f"无法读取图像: {file_path}")
     return img
@@ -395,43 +397,330 @@ def run_forgery_checks(file_path: str, img_cv: np.ndarray) -> list[ForgeryCheck]
 # ─────────────────────────────────────────────────────────────
 
 def detect_seal(img: np.ndarray) -> tuple:
+    """
+    检测图像中的红色印章区域，返回裁剪后的印章图像和位置信息。
+
+    策略：
+    1. 在原始红色掩膜上做轻量闭运算（仅填充微小孔洞，不抹除薄片断）
+    2. 直接 findContours → 过滤噪声碎片（面积 < 阈值）
+    3. 对所有有效轮廓取并集边界框（union bounding box），而非单个最大轮廓
+    4. 即使印章被文字/线条割裂成多块，也能完整截取整个印章
+    """
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     m1  = cv2.inRange(hsv, np.array([0,70,70]),   np.array([10,255,255]))
     m2  = cv2.inRange(hsv, np.array([160,70,70]), np.array([180,255,255]))
     red_mask = cv2.bitwise_or(m1, m2)
-    kernel   = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (15,15))
-    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel)
-    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN,  kernel)
 
-    contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    if not contours:
+    if red_mask.sum() == 0:
         print("  ⚠️  未检测到红色印章，使用整图")
         return img, (0, 0, img.shape[1], img.shape[0]), False
 
-    largest = max(contours, key=cv2.contourArea)
-    area    = cv2.contourArea(largest)
-    if area < 1000:
-        print(f"  ⚠️  印章区域过小({area:.0f}px)，使用整图")
+    # 轻量闭运算：仅填充微小孔洞（3×3），不抹除印章薄片断
+    tiny_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, tiny_kernel)
+
+    # 在原始掩膜上找轮廓（不过度预处理，保留所有印章碎片）
+    contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        print("  ⚠️  未检测到红色印章轮廓，使用整图")
         return img, (0, 0, img.shape[1], img.shape[0]), False
 
-    x, y, w, h = cv2.boundingRect(largest)
+    # 过滤噪声碎片：保留面积 >= 图像总面积 0.02% 的轮廓
+    img_area = img.shape[0] * img.shape[1]
+    min_contour_area = max(300, img_area * 0.0002)  # 至少 300px，或图像面积的 0.02%
+    seal_contours = [c for c in contours if cv2.contourArea(c) >= min_contour_area]
+
+    if not seal_contours:
+        print(f"  ⚠️  所有红色轮廓面积均 < {min_contour_area:.0f}px（噪声），使用整图")
+        return img, (0, 0, img.shape[1], img.shape[0]), False
+
+    total_area = sum(cv2.contourArea(c) for c in seal_contours)
+    if total_area < 1000:
+        print(f"  ⚠️  有效印章区域过小({total_area:.0f}px)，使用整图")
+        return img, (0, 0, img.shape[1], img.shape[0]), False
+
+    # ★ 取所有有效轮廓的并集边界框（union bounding box）
+    all_points = np.vstack([c.reshape(-1, 2) for c in seal_contours])
+    x = int(np.min(all_points[:, 0]))
+    y = int(np.min(all_points[:, 1]))
+    w = int(np.max(all_points[:, 0]) - x + 1)
+    h = int(np.max(all_points[:, 1]) - y + 1)
+
     pad = int(max(w, h) * 0.1)
-    x   = max(0, x - pad);  y = max(0, y - pad)
-    w   = min(img.shape[1] - x, w + 2*pad)
-    h   = min(img.shape[0] - y, h + 2*pad)
-    print(f"  ✅ 检测到印章 ({x},{y}) {w}×{h}px，面积{area:.0f}px²")
+    x = max(0, x - pad)
+    y = max(0, y - pad)
+    w = min(img.shape[1] - x, w + 2 * pad)
+    h = min(img.shape[0] - y, h + 2 * pad)
+
+    print(f"  ✅ 检测到印章 ({x},{y}) {w}×{h}px，{len(seal_contours)}个有效碎片，总面积{total_area:.0f}px²")
     return img[y:y+h, x:x+w], (x, y, w, h), True
 
 
-def normalize_seal(seal_img: np.ndarray, size: int = 400) -> np.ndarray:
-    h, w   = seal_img.shape[:2]
-    scale  = size / max(h, w)
-    new_w, new_h = int(w*scale), int(h*scale)
-    resized = cv2.resize(seal_img, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
-    canvas  = np.ones((size, size, 3), dtype=np.uint8) * 255
-    y_off   = (size - new_h) // 2;  x_off = (size - new_w) // 2
-    canvas[y_off:y_off+new_h, x_off:x_off+new_w] = resized
-    return canvas
+# ─────────────────────────────────────────────────────────────
+# ★ 五角星星心检测与配准（以星心为基准对齐两枚印章）
+# ─────────────────────────────────────────────────────────────
+
+def detect_five_pointed_star(seal_img: np.ndarray) -> dict:
+    """
+    在一枚印章图像中检测中央五角星，返回星心坐标、外接圆半径、五个顶点。
+
+    检测策略（凸包五边形法，比 convexityDefects 更鲁棒）：
+    1. HSV 提取红色掩膜 → 取图像中央区域（星心必在中心）
+    2. findContours → 对每个轮廓计算凸包
+    3. 将凸包近似为多边形：若恰好 5 个顶点且近似正五边形 → 即五角星的 5 个尖端
+    4. 验证：5 顶点到中心的距离标准差 < 15%（正五边形特征）
+
+    Returns:
+        {'success': bool, 'center': (cx,cy), 'radius': float, 'tips': np.ndarray(5,2)}
+        失败时 success=False 并附带 'reason' 字段。
+    """
+    h, w = seal_img.shape[:2]
+    img_area = h * w
+
+    # ── 提取红色区域 ──
+    hsv = cv2.cvtColor(seal_img, cv2.COLOR_BGR2HSV)
+    m1 = cv2.inRange(hsv, np.array([0, 70, 70]), np.array([10, 255, 255]))
+    m2 = cv2.inRange(hsv, np.array([160, 70, 70]), np.array([180, 255, 255]))
+    red_mask = cv2.bitwise_or(m1, m2)
+
+    if red_mask.sum() < 100:
+        return {'success': False, 'reason': '无红色区域'}
+
+    # ── 中央区域（星心不会在边缘）──
+    cx_img, cy_img = w // 2, h // 2
+    center_radius = int(min(w, h) * 0.40)  # 40% 略大于上一版，低分辨率下更宽容
+    center_circle = np.zeros(red_mask.shape, dtype=np.uint8)
+    cv2.circle(center_circle, (cx_img, cy_img), center_radius, 255, -1)
+    red_center = cv2.bitwise_and(red_mask, center_circle)
+
+    if red_center.sum() < 80:
+        return {'success': False, 'reason': '中央红色区域过小（可能无星）'}
+
+    # ── 多策略尝试：raw / close / dilate ──
+    candidates = []  # (contour, hull_vertices_5, center, radius, score)
+
+    for label, mask in [
+        ("raw",   red_center),
+        ("close", cv2.morphologyEx(red_center, cv2.MORPH_CLOSE,
+                    cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))),
+        ("dilate", cv2.dilate(red_center,
+                    cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)), iterations=1)),
+    ]:
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        for c in contours:
+            area = cv2.contourArea(c)
+            if area < 20:
+                continue
+
+            # 凸包 → 多边形近似
+            hull = cv2.convexHull(c)
+            peri = cv2.arcLength(hull, True)
+            # 自适应 epsilon：轮廓周长的 2%~4%
+            for eps_factor in [0.02, 0.03, 0.04]:
+                hull_approx = cv2.approxPolyDP(hull, eps_factor * peri, True)
+                n_verts = len(hull_approx)
+                if n_verts == 5:
+                    verts = hull_approx.reshape(-1, 2).astype(np.float32)
+                    v_center = verts.mean(axis=0)
+                    v_dists  = np.linalg.norm(verts - v_center, axis=1)
+                    v_mean   = v_dists.mean()
+                    if v_mean < 1:
+                        continue
+                    v_cv = v_dists.std() / v_mean  # 变异系数，越小越接近正多边形
+
+                    # 靠近图像中心
+                    dist_to_img_center = np.sqrt((v_center[0]-cx_img)**2 + (v_center[1]-cy_img)**2)
+                    cent_score = max(0.0, 1.0 - dist_to_img_center / (center_radius * 0.6))
+
+                    # 正五边形特征：变异系数 < 15%
+                    if v_cv < 0.18:
+                        score = area * cent_score * (1.0 - v_cv)
+                        candidates.append((c, verts, v_center, v_mean, score))
+                    break  # 找到 5 顶点就不再试更大 epsilon
+
+    if not candidates:
+        return {'success': False, 'reason': f'中央区域无正五边形凸包（共{len(contours) if "contours" in dir() else 0}个轮廓）'}
+
+    # ── 选最优：面积大 + 靠近中心 + 正五边形变异系数小 ──
+    best = max(candidates, key=lambda x: x[4])
+    _, verts, center, radius, _ = best
+
+    # ── 用凸包径向距离剖面找峰（比 approxPolyDP 顶点更稳定）──
+    # approxPolyDP 对轮廓噪声敏感，不同图像可能选出不同的顶点集合。
+    # 改为：取最佳候选的 hull 点，计算径向距离剖面，找 5 个峰。
+    c, hull = best[0], cv2.convexHull(best[0])
+    hull_pts = hull.reshape(-1, 2).astype(np.float32)
+    cx_h = float(center[0])
+    cy_h = float(center[1])
+
+    # 计算各 hull 点的角度和径向距离
+    h_angles = np.arctan2(hull_pts[:, 0] - cx_h, -(hull_pts[:, 1] - cy_h))
+    h_dists  = np.linalg.norm(hull_pts - np.array([cx_h, cy_h]), axis=1)
+
+    # 按角度排序
+    sort_i = np.argsort(h_angles % (2 * np.pi))
+    h_angles = h_angles[sort_i]
+    h_dists  = h_dists[sort_i]
+
+    # 找局部最大值（峰=星尖）：距离大于左右邻居
+    n = len(h_dists)
+    peaks = []
+    for i in range(n):
+        prev_i = (i - 1) % n
+        next_i = (i + 1) % n
+        if h_dists[i] > h_dists[prev_i] and h_dists[i] > h_dists[next_i]:
+            peaks.append((h_angles[i], h_dists[i], hull_pts[sort_i][i]))
+
+    if len(peaks) < 5:
+        # 回退：用 approxPolyDP 顶点
+        angles = np.arctan2(verts[:, 0] - cx_h, -(verts[:, 1] - cy_h))
+        sorted_idx = np.argsort(angles % (2 * np.pi))
+        tips = verts[sorted_idx]
+    else:
+        # 保留最高的 5 个峰
+        peaks.sort(key=lambda x: x[1], reverse=True)
+        peaks = peaks[:5]
+        # 按角度排序
+        peaks.sort(key=lambda x: x[0] % (2 * np.pi))
+        tips = np.array([p[2] for p in peaks], dtype=np.float32)
+        # 重新计算中心（以峰点质心）
+        center = tuple(tips.mean(axis=0).astype(float))
+        radius = float(np.mean(np.linalg.norm(tips - np.array(center), axis=1)))
+
+    return {
+        'success': True,
+        'center': (float(center[0]), float(center[1])),
+        'radius': float(radius),
+        'tips': tips,
+    }
+
+
+def _fine_align(query: np.ndarray, reference: np.ndarray,
+                max_shift=15, max_rot=3.0) -> np.ndarray:
+    """
+    ECC 亚像素微调：在星尖粗对齐后，用 findTransformECC 修正残留的
+    平移（±max_shift px）和微旋转（±max_rot deg）。
+    """
+    gq = cv2.cvtColor(query, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    gr = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+    # 初始单位矩阵（ECC 从此出发迭代优化）
+    warp_matrix = np.eye(2, 3, dtype=np.float32)
+    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 100, 1e-6)
+
+    try:
+        _, warp_matrix = cv2.findTransformECC(
+            gr, gq, warp_matrix,
+            cv2.MOTION_EUCLIDEAN,  # 允许平移+微旋转
+            criteria,
+            None, max_shift)       # max_pixel_step 限制搜索范围
+        # 校验：旋转角不超过 max_rot 度
+        ecc_rot = np.degrees(np.arctan2(warp_matrix[1, 0], warp_matrix[0, 0]))
+        ecc_shift = max(abs(warp_matrix[0, 2]), abs(warp_matrix[1, 2]))
+        if abs(ecc_rot) > max_rot or ecc_shift > 30:
+            print(f'  ⚠️  ECC 异常: rot={ecc_rot:+.2f}deg shift={ecc_shift:.1f}px, 跳过微调')
+            return query
+        h, w = reference.shape[:2]
+        aligned = cv2.warpAffine(query, warp_matrix, (w, h),
+                                  flags=cv2.INTER_LANCZOS4 + cv2.WARP_INVERSE_MAP,
+                                  borderMode=cv2.BORDER_CONSTANT,
+                                  borderValue=(255, 255, 255))
+        print(f'  🔧 ECC微调: rot={ecc_rot:+.2f}deg shift=({warp_matrix[0,2]:+.1f},{warp_matrix[1,2]:+.1f})px')
+        return aligned
+    except cv2.error as e:
+        print(f'  ⚠️  ECC失败({e.err}), 跳过微调')
+        return query
+
+
+def align_by_star(seal_q: np.ndarray, seal_r: np.ndarray,
+                  rot_q_steps: int = 0, rot_r_steps: int = 0) -> tuple:
+    """
+    Independent normalization: both seals rotated so star tip points UP.
+    No rotation ambiguity - tips[0] always at 12 o'clock.
+    rot_q_steps / rot_r_steps: extra 72° steps (0~4) for manual disambiguation.
+    After coarse star alignment, ECC fine-tunes residual shift/rotation.
+    Returns (aligned_q, aligned_r) at identical canvas size.
+    """
+    star_q = detect_five_pointed_star(seal_q)
+    star_r = detect_five_pointed_star(seal_r)
+
+    if not star_q['success'] or not star_r['success']:
+        rq = star_q.get('reason', ''); rr = star_r.get('reason', '')
+        print(f'  WARN star fail (q:{rq}|r:{rr}), fallback ORB')
+        h_q, w_q = seal_q.shape[:2]; h_r, w_r = seal_r.shape[:2]
+        ar = (h_r * w_r) / max(h_q * w_q, 1); s = np.sqrt(ar)
+        nw, nh = max(1, int(w_q * s)), max(1, int(h_q * s))
+        sq = cv2.resize(seal_q, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
+        cv = np.ones((h_r, w_r, 3), dtype=np.uint8) * 255
+        yo, xo = max(0, (h_r - nh) // 2), max(0, (w_r - nw) // 2)
+        ph, pw = min(nh, h_r), min(nw, w_r)
+        cv[yo:yo+ph, xo:xo+pw] = sq[:ph, :pw]
+        return align_seals(cv, seal_r), seal_r
+
+    q_cx, q_cy = star_q['center']
+    r_cx, r_cy = star_r['center']
+
+    def _tip_deg(tip, cx, cy):
+        return float(np.degrees(np.arctan2(tip[0] - cx, -(tip[1] - cy))))
+
+    aq = _tip_deg(star_q['tips'][0], q_cx, q_cy)
+    ar_deg = _tip_deg(star_r['tips'][0], r_cx, r_cy)
+
+    # debug: show all 5 tip angles
+    q_tips_deg = [_tip_deg(star_q['tips'][k], q_cx, q_cy) for k in range(5)]
+    r_tips_deg = [_tip_deg(star_r['tips'][k], r_cx, r_cy) for k in range(5)]
+    q_str = '[' + ', '.join(f'{t:+.1f}' for t in q_tips_deg) + ']'
+    r_str = '[' + ', '.join(f'{t:+.1f}' for t in r_tips_deg) + ']'
+    print(f'  STAR tips: Q={q_str}  R={r_str}')
+
+    rot_q = -aq
+    rot_r = -ar_deg
+
+    scale = star_r['radius'] / max(star_q['radius'], 1e-6)
+    csize = int(max(seal_r.shape[:2]) * 1.3)
+    ccx = csize // 2
+    ccy = csize // 2
+
+    def _upright(img, cx, cy, deg, sc=1.0):
+        rad = np.radians(deg)
+        c = sc * np.cos(rad)
+        s_val = sc * np.sin(rad)
+        tx = ccx - (c * cx - s_val * cy)
+        ty = ccy - (s_val * cx + c * cy)
+        M = np.array([[c, -s_val, tx], [s_val, c, ty]], dtype=np.float64)
+        return cv2.warpAffine(img, M, (csize, csize),
+                               flags=cv2.INTER_LANCZOS4,
+                               borderMode=cv2.BORDER_CONSTANT,
+                               borderValue=(255, 255, 255))
+
+    ar_img = _upright(seal_r, r_cx, r_cy, rot_r, 1.0)
+    aq_img = _upright(seal_q, q_cx, q_cy, rot_q, scale)
+
+    # ── 额外旋转（人工消歧，每次 72°，CSS 顺时针=OpenCV 逆时针需取负）──
+    if rot_q_steps % 5 != 0:
+        extra_q = rot_q_steps % 5 * 72.0
+        M_q = cv2.getRotationMatrix2D((ccx, ccy), -extra_q, 1.0)  # CSS顺时针→CV负角
+        aq_img = cv2.warpAffine(aq_img, M_q, (csize, csize),
+                                 flags=cv2.INTER_LANCZOS4,
+                                 borderMode=cv2.BORDER_CONSTANT,
+                                 borderValue=(255, 255, 255))
+        rot_q += extra_q   # log用正值（顺时针度数）
+    if rot_r_steps % 5 != 0:
+        extra_r = rot_r_steps % 5 * 72.0
+        M_r = cv2.getRotationMatrix2D((ccx, ccy), -extra_r, 1.0)  # CSS顺时针→CV负角
+        ar_img = cv2.warpAffine(ar_img, M_r, (csize, csize),
+                                 flags=cv2.INTER_LANCZOS4,
+                                 borderMode=cv2.BORDER_CONSTANT,
+                                 borderValue=(255, 255, 255))
+        rot_r += extra_r
+
+    print(f'  STAR norm: q_rot={rot_q:+.1f}deg(+{rot_q_steps%5}*72) scale={scale:.3f}x '
+          f'r_rot={rot_r:+.1f}deg(+{rot_r_steps%5}*72) canvas={csize}')
+
+    # ── ECC 亚像素微调（修正星尖检测残留的偏移）──
+    aq_img = _fine_align(aq_img, ar_img, max_shift=15, max_rot=3.0)
+
+    return aq_img, ar_img
 
 
 def align_seals(seal_q: np.ndarray, seal_r: np.ndarray) -> np.ndarray:
@@ -497,10 +786,40 @@ def analyze_difference(seal_q: np.ndarray, seal_r: np.ndarray) -> dict:
     if area_ratio > 3:
         print(f"  ⚠️  两章印章区域面积比{area_ratio:.1f}x（阈值3x），检测结果可能不可靠，请人工确认")
 
+    # ── RGBA 分层：叠加图拆成样本红层 + 检材蓝层，供 HTML 独立旋转 ──
+    h, w = gray_r.shape
+
+    # 样本层（底）：白底 + 红色墨迹 → 显示为红色
+    # OpenCV BGRA: B=0, G=0, R=gray_r, A=255
+    ref_layer = np.full((h, w, 4), 255, dtype=np.uint8)  # 白底不透明
+    ink_r = gray_r < 245
+    ref_layer[ink_r, 0] = 0              # B=0
+    ref_layer[ink_r, 1] = 0              # G=0
+    ref_layer[ink_r, 2] = gray_r[ink_r]  # R=样本灰度
+
+    # 检材层（上）：透明底 + 蓝色墨迹 → 显示为蓝色
+    # OpenCV BGRA: B=gray_q, G=0, R=0, A=半透明
+    q_layer = np.zeros((h, w, 4), dtype=np.uint8)  # 透明
+    ink_q = gray_q < 245
+    q_layer[ink_q, 0] = gray_q[ink_q]   # B=检材灰度
+    q_layer[ink_q, 1] = 0                # G=0
+    q_layer[ink_q, 2] = 0                # R=0
+    q_layer[ink_q, 3] = 200              # A=半透明(200/255≈78%)
+    # 差异轮廓画在检材层
+    cv2.drawContours(q_layer, diff_contours, -1, (255, 255, 0, 255), 2)  # BGRA 青
+
+    def bgra_to_data_url(img):
+        ok, buf = cv2.imencode(".png", img)
+        if not ok:
+            return ""
+        return "data:image/png;base64," + base64.b64encode(buf.tobytes()).decode()
+
     print(f"  📊 SSIM={score:.4f}  差异像素={diff_ratio:.2%}  红色IoU={red_iou:.4f}")
     return dict(ssim=float(score), diff_ratio=float(diff_ratio),
                 red_iou=float(red_iou), diff_img=diff,
                 heatmap=heatmap, overlay=overlay_marked,
+                overlay_r_img=bgra_to_data_url(ref_layer),
+                overlay_q_img=bgra_to_data_url(q_layer),
                 area_ratio=float(area_ratio))
 
 
@@ -584,53 +903,82 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <title>印章鉴定报告</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#2c3e50}}
+body{{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#2c3e50;
+     max-width:960px;margin:0 auto;font-size:16px}}
 
-.header{{background:linear-gradient(135deg,#1a1a2e,#0f3460);color:white;padding:28px 40px;
+.header{{background:linear-gradient(135deg,#1a1a2e,#0f3460);color:white;padding:24px 32px;
          display:flex;justify-content:space-between;align-items:center}}
-.header h1{{font-size:22px;letter-spacing:2px}}
-.header .meta{{font-size:12px;opacity:.7;text-align:right;line-height:1.8}}
+.header h1{{font-size:24px;letter-spacing:2px}}
+.header .meta{{font-size:14px;opacity:.7;text-align:right;line-height:1.8}}
 
-.verdict{{background:{verdict_color};color:white;padding:14px 40px;
-          display:flex;align-items:center;gap:12px;font-size:18px;font-weight:700}}
-.verdict-score{{margin-left:auto;font-size:14px;font-weight:400;
+.verdict{{background:{verdict_color};color:white;padding:14px 32px;
+          display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700}}
+.verdict-score{{margin-left:auto;font-size:15px;font-weight:400;
                background:rgba(255,255,255,.2);padding:4px 14px;border-radius:20px}}
 
-.main{{display:grid;grid-template-columns:1fr 1.3fr;gap:20px;padding:20px 40px}}
-.panel{{background:white;border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.07)}}
-.ptitle{{font-size:12px;font-weight:700;color:#7f8c8d;text-transform:uppercase;
-         letter-spacing:1.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #ecf0f1}}
+.grid4{{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 32px}}
+.cell{{background:white;border-radius:10px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.07);
+       display:flex;flex-direction:column}}
+.cell-head{{display:flex;align-items:center;gap:6px;height:30px;flex-shrink:0}}
+.cell-img{{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;
+           min-height:0}}
+.cell-img img{{width:100%;max-height:100%;object-fit:contain;border-radius:6px;
+              border:1px solid #ecf0f1;transition:transform 0.3s}}
+.cell-foot{{flex-shrink:0;height:28px;display:flex;align-items:center;gap:14px;font-size:12px}}
+.cell-foot-empty{{height:28px;flex-shrink:0}}
+.ptitle{{font-size:14px;font-weight:700;color:#7f8c8d;text-transform:uppercase;
+         letter-spacing:1.5px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #ecf0f1}}
 
-.seal-label{{font-size:11px;font-weight:700;color:white;display:inline-block;
-             padding:2px 8px;border-radius:3px;margin-bottom:6px}}
-.seal-img{{width:100%;border-radius:6px;border:1px solid #ecf0f1;display:block;margin-bottom:12px}}
+.metrics-bar{{display:flex;gap:16px;padding:8px 32px;justify-content:center}}
+
+.seal-label{{font-size:12px;font-weight:700;color:white;display:inline-block;
+             padding:3px 8px;border-radius:3px;line-height:1}}
+.seal-img{{width:100%;border-radius:6px;border:1px solid #ecf0f1;display:block;
+           margin:0 auto 8px;transition:transform 0.3s}}
+.overlay-wrap{{width:100%;position:relative;background:white}}
+.overlay-wrap img{{width:100%;border-radius:6px;border:1px solid #ecf0f1}}
+.seal-heatmap{{width:100%;margin:0 auto;display:block}}
 
 .metrics{{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}}
-.metric{{background:#f8f9fa;border-radius:8px;padding:12px;text-align:center}}
-.mv{{font-size:20px;font-weight:700}}
-.ml{{font-size:11px;color:#95a5a6;margin-top:3px}}
+.metric{{background:white;border-radius:8px;padding:12px;text-align:center;
+         box-shadow:0 2px 10px rgba(0,0,0,.07);min-width:120px}}
+.mv{{font-size:22px;font-weight:700}}
+.ml{{font-size:13px;color:#95a5a6;margin-top:3px}}
 
-.legend{{display:flex;gap:14px;font-size:11px;flex-wrap:wrap;margin-top:8px}}
-.ld{{display:flex;align-items:center;gap:5px}}
+.legend{{display:flex;gap:12px;font-size:12px;flex-wrap:wrap}}
+.ld{{display:flex;align-items:center;gap:4px}}
 .dot{{width:10px;height:10px;border-radius:50%;flex-shrink:0}}
 
-.footer{{padding:0 40px 30px}}
+.footer{{padding:0 32px 30px}}
 .abox{{background:white;border-radius:10px;padding:18px;
        box-shadow:0 2px 10px rgba(0,0,0,.07);margin-bottom:16px}}
-.reason-item{{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid #f5f5f5;font-size:13px}}
+.reason-item{{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:15px}}
 .reason-item:last-child{{border-bottom:none}}
-.ai-text{{margin-top:12px;font-size:13px;line-height:1.8;color:#555;
+.ai-text{{margin-top:12px;font-size:15px;line-height:1.8;color:#555;
           background:#f8f9fa;padding:12px;border-radius:6px}}
 
 /* 文件真实性检测区块 */
 .check-row{{padding:10px 0;border-bottom:1px solid #f0f0f0}}
 .check-row:last-child{{border-bottom:none}}
 .check-header{{display:flex;align-items:center;gap:8px;margin-bottom:4px}}
-.check-badge{{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;color:white}}
-.check-name{{font-size:13px;font-weight:600}}
-.check-detail{{font-size:12px;color:#666;line-height:1.6;padding-left:2px}}
+.check-badge{{font-size:12px;font-weight:700;padding:2px 8px;border-radius:10px;color:white}}
+.check-name{{font-size:15px;font-weight:600}}
+.check-detail{{font-size:13px;color:#666;line-height:1.6;padding-left:2px}}
 
-.disclaimer{{text-align:center;padding:14px;font-size:11px;color:#bdc3c7}}
+.disclaimer{{text-align:center;padding:14px;font-size:13px;color:#bdc3c7}}
+
+.rotate-btn{{display:inline-block;padding:3px 10px;background:#3498db;color:white;
+            border:none;border-radius:3px;cursor:pointer;font-size:11px;line-height:1}}
+.rotate-btn:hover{{background:#2980b9}}
+.rot-deg{{display:inline-block;margin-left:4px;font-weight:700;min-width:2.5em;font-size:11px;line-height:1}}
+
+.rerun-bar{{display:flex;align-items:center;gap:12px;padding:12px 32px;background:#f8f9fa;
+            border-bottom:1px solid #ecf0f1;font-size:14px}}
+.rerun-title{{font-weight:700;color:#2c3e50}}
+.rerun-hint{{color:#7f8c8d}}
+.rerun-code{{background:#2d3436;color:#dfe6e9;padding:6px 12px;border-radius:4px;
+             font-family:'Consolas','Monaco',monospace;font-size:12px;
+             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}}
 </style>
 </head>
 <body>
@@ -652,39 +1000,67 @@ body{{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;
   <span class="verdict-score">综合评分 {verdict_score:.1%}</span>
 </div>
 
-<div class="main">
-  <!-- 左：印章对比 -->
-  <div class="panel">
-    <div class="ptitle">印章样本对比</div>
-    <span class="seal-label" style="background:#e74c3c">检材（待鉴定）</span>
-    <img class="seal-img" src="{query_img}">
-    <span class="seal-label" style="background:#2980b9">样本（真实参考）</span>
-    <img class="seal-img" src="{ref_img}">
-    <div style="margin-top:14px">
-      <div class="ptitle">量化指标</div>
-      <div class="metrics">
-        <div class="metric"><div class="mv" style="color:{ssim_color}">{ssim:.3f}</div><div class="ml">SSIM 结构相似度</div></div>
-        <div class="metric"><div class="mv" style="color:{iou_color}">{red_iou:.3f}</div><div class="ml">红色区域 IoU</div></div>
-        <div class="metric"><div class="mv" style="color:{diff_color}">{diff_ratio:.1%}</div><div class="ml">差异像素比例</div></div>
+<div class="rerun-bar">
+  <span class="rerun-title">🔄 方向调整</span>
+  <span class="rerun-hint">如方向不正，点旋转按钮预览，确认后重跑：</span>
+  <code id="rerunCmd" class="rerun-code"></code>
+  <button class="rotate-btn" onclick="copyCmd()">📋 复制</button>
+</div>
+
+<div class="grid4">
+  <!-- 左上：检材 -->
+  <div class="cell">
+    <div class="cell-head">
+      <span class="seal-label" style="background:#e74c3c">检材（待鉴定）</span>
+      <button class="rotate-btn" onclick="rotateQ()">↻72°</button>
+      <span class="rot-deg" id="rotQ">0°</span>
+    </div>
+    <div class="cell-img"><img class="seal-q" src="{query_img}"></div>
+    <div class="cell-foot-empty"></div>
+  </div>
+  <!-- 右上：叠加差异 -->
+  <div class="cell">
+    <div class="cell-head">
+      <span class="seal-label" style="background:#8e44ad">叠加差异对比</span>
+    </div>
+    <div class="cell-img">
+      <div class="overlay-wrap">
+        <img class="overlay-r-layer" src="{overlay_r_img}">
+        <img class="overlay-q-layer" src="{overlay_q_img}" style="position:absolute;top:0;left:0">
       </div>
     </div>
-  </div>
-
-  <!-- 右：叠加对比 -->
-  <div class="panel">
-    <div class="ptitle">叠加差异对比</div>
-    <img class="seal-img" src="{overlay_img}">
-    <div class="legend">
+    <div class="cell-foot">
       <div class="ld"><div class="dot" style="background:#f44"></div><span>仅检材有</span></div>
       <div class="ld"><div class="dot" style="background:#44f"></div><span>仅样本有</span></div>
-      <div class="ld"><div class="dot" style="background:#fff;border:1px solid #ddd"></div><span>吻合</span></div>
+      <div class="ld"><div class="dot" style="background:#f0f"></div><span>重合</span></div>
       <div class="ld"><div class="dot" style="background:#0ff"></div><span>差异轮廓</span></div>
     </div>
-    <div style="margin-top:14px">
-      <div class="ptitle">差异热图</div>
-      <img class="seal-img" src="{heatmap_img}">
-    </div>
   </div>
+  <!-- 左下：样本 -->
+  <div class="cell">
+    <div class="cell-head">
+      <span class="seal-label" style="background:#2980b9">样本（真实参考）</span>
+      <button class="rotate-btn" onclick="rotateR()">↻72°</button>
+      <span class="rot-deg" id="rotR">0°</span>
+    </div>
+    <div class="cell-img"><img class="seal-r" src="{ref_img}"></div>
+    <div class="cell-foot-empty"></div>
+  </div>
+  <!-- 右下：热图 -->
+  <div class="cell">
+    <div class="cell-head">
+      <span class="seal-label" style="background:#d35400">差异热图</span>
+    </div>
+    <div class="cell-img"><img class="seal-heatmap" src="{heatmap_img}"></div>
+    <div class="cell-foot-empty"></div>
+  </div>
+</div>
+
+<!-- 量化指标 -->
+<div class="metrics-bar">
+  <div class="metric"><div class="mv" style="color:{ssim_color}">{ssim:.3f}</div><div class="ml">SSIM 结构相似度</div></div>
+  <div class="metric"><div class="mv" style="color:{iou_color}">{red_iou:.3f}</div><div class="ml">红色区域 IoU</div></div>
+  <div class="metric"><div class="mv" style="color:{diff_color}">{diff_ratio:.1%}</div><div class="ml">差异像素比例</div></div>
 </div>
 
 <div class="footer">
@@ -705,12 +1081,51 @@ body{{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;
 </div>
 
 <div class="disclaimer">本报告由自动化图像分析生成，仅供参考，法律鉴定须委托专业机构出具。</div>
+<script>
+let rotQ = 0, rotR = 0;
+const qStep = 0, rStep = 0;  // initial steps from CLI
+const qPath = '{query_path}';
+const rPath = '{ref_path}';
+const sPath = '{script_path}';
+const oPath = '{output_path}';
+function updateCmd() {{
+  const qs = rotQ / 72, rs = rotR / 72;
+  let cmd = 'python "' + sPath + '" "' + qPath + '" "' + rPath + '" --output "' + oPath + '"';
+  if (qs > 0) cmd += ' --rot-q ' + qs;
+  if (rs > 0) cmd += ' --rot-r ' + rs;
+  document.getElementById('rerunCmd').textContent = cmd;
+}}
+updateCmd();
+function rotateQ() {{
+  rotQ = (rotQ + 72) % 360;
+  document.getElementById('rotQ').textContent = rotQ + '\\u00b0';
+  document.querySelectorAll('.seal-q, .overlay-q-layer, .seal-heatmap').forEach(el => {{
+    el.style.transform = 'rotate(' + rotQ + 'deg)';
+  }});
+  updateCmd();
+}}
+function rotateR() {{
+  rotR = (rotR + 72) % 360;
+  document.getElementById('rotR').textContent = rotR + '\\u00b0';
+  document.querySelectorAll('.seal-r, .overlay-r-layer').forEach(el => {{
+    el.style.transform = 'rotate(' + rotR + 'deg)';
+  }});
+  updateCmd();
+}}
+function copyCmd() {{
+  const cmd = document.getElementById('rerunCmd').textContent;
+  navigator.clipboard.writeText(cmd).then(() => {{
+    alert('已复制命令到剪贴板');
+  }});
+}}
+</script>
 </body>
 </html>"""
 
 
 def generate_report(seal_q, seal_r, metrics, judgment, ai_text,
-                    forgery_checks, query_name, ref_name, output_path):
+                    forgery_checks, query_name, ref_name, output_path,
+                    query_path="", ref_path="", script_path=""):
     def c(val, hi=True, w=.75, b=.60):
         if hi:  return "#2ecc71" if val>=w else ("#f39c12" if val>=b else "#e74c3c")
         else:   return "#2ecc71" if val<=(1-w) else ("#f39c12" if val<=(1-b) else "#e74c3c")
@@ -724,12 +1139,16 @@ def generate_report(seal_q, seal_r, metrics, judgment, ai_text,
 
     html = HTML_TEMPLATE.format(
         query_name=query_name, ref_name=ref_name,
+        query_path=query_path.replace("\\", "/"), ref_path=ref_path.replace("\\", "/"),
+        script_path=script_path.replace("\\", "/"), output_path=output_path.replace("\\", "/"),
         timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         verdict_color=judgment["color"], verdict_icon=judgment["icon"],
         verdict=judgment["verdict"],     verdict_level=judgment["level"],
         verdict_score=judgment["score"],
         query_img=img_to_data_url(seal_q), ref_img=img_to_data_url(seal_r),
         overlay_img=img_to_data_url(metrics["overlay"]),
+        overlay_r_img=metrics["overlay_r_img"],
+        overlay_q_img=metrics["overlay_q_img"],
         heatmap_img=img_to_data_url(metrics["heatmap"]),
         ssim=metrics["ssim"], red_iou=metrics["red_iou"], diff_ratio=metrics["diff_ratio"],
         ssim_color=c(metrics["ssim"]),  iou_color=c(metrics["red_iou"]),
@@ -750,10 +1169,14 @@ def main():
     parser.add_argument("query",  help="检材文件（jpg/png/pdf）")
     parser.add_argument("ref",    help="样本文件（jpg/png/pdf）")
     parser.add_argument("--output", default="seal_report.html")
+    parser.add_argument("--rot-q", type=int, default=0,
+                        help="检材额外旋转步数(0~4)，每步72°，用于人工消歧")
+    parser.add_argument("--rot-r", type=int, default=0,
+                        help="样本额外旋转步数(0~4)，每步72°，用于人工消歧")
     args = parser.parse_args()
 
     print("\n" + "="*52)
-    print("  🔍 印章真伪鉴定系统 v2")
+    print("  🔍 印章真伪鉴定系统 v3（星心配准）")
     print("="*52)
 
     print("\n[1/7] 加载文件...")
@@ -767,18 +1190,16 @@ def main():
     seal_q_raw, _, _ = detect_seal(img_q)
     seal_r_raw, _, _ = detect_seal(img_r)
 
-    print("\n[4/7] 归一化...")
-    seal_q = normalize_seal(seal_q_raw)
-    seal_r = normalize_seal(seal_r_raw)
+    print("\n[4/7] 星心归一化（各自旋转至星尖朝上）...")
+    seal_q_aligned, seal_r = align_by_star(seal_q_raw, seal_r_raw,
+                                               rot_q_steps=args.rot_q,
+                                               rot_r_steps=args.rot_r)
 
-    print("\n[5/7] 图像配准...")
-    seal_q_aligned = align_seals(seal_q, seal_r)
-
-    print("\n[6/7] 差异分析...")
+    print("\n[5/7] 差异分析...")
     metrics  = analyze_difference(seal_q_aligned, seal_r)
     judgment = judge_authenticity(metrics)
 
-    print("\n[7/7] AI分析 + 生成报告...")
+    print("\n[6/7] AI分析 + 生成报告...")
     ai_text = ai_analysis(seal_q_aligned, seal_r, metrics["overlay"])
     if not ai_text:
         print("  ⏭  未设置ANTHROPIC_API_KEY，跳过AI分析")
@@ -790,6 +1211,8 @@ def main():
         query_name=Path(args.query).name,
         ref_name=Path(args.ref).name,
         output_path=args.output,
+        query_path=args.query, ref_path=args.ref,
+        script_path=str(Path(__file__).resolve()),
     )
 
     # 文件真实性汇总
